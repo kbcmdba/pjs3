@@ -53,10 +53,18 @@ A `web/` frontend (React + Vite) will land alongside `api/` once the backend has
 
 ## Contributing
 
-PJS3 is developed in the open and welcomes pull requests. Two things to know before opening one:
+PJS3 is developed in the open and welcomes pull requests. A few things to know before opening one:
 
 1. **TDD is mandatory.** Any change to production code must be accompanied by a test. Bug fixes start with a test that reproduces the bug.
-2. **PRs get two reviewers** — the author (@kbcmdba) and the Claude Code collaborator working on the project — before merge. Expect substantive review, not a rubber stamp.
+2. **Every change goes through a PR** from a feature branch (`feat/*`, `fix/*`, `chore/*`, `docs/*`). Main stays stable.
+3. **Merge strategy: Rebase and merge *or* Create a merge commit — never Squash and merge.** Squashing flattens the red/green TDD commits into one and destroys the learning-artifact history this project preserves on purpose.
+4. **PRs get two reviewers** — the author (@kbcmdba) and the Claude Code collaborator working on the project — before merge. Expect substantive review, not a rubber stamp.
+
+### Forge setup
+
+Active development happens on a self-hosted Forgejo instance that mirrors to this GitHub repo. External contributors fork and submit PRs here on GitHub; we'll review them with the same TDD and merge-strategy expectations. The GitHub commit history is the read-side truth of the project.
+
+A `.github/pull_request_template.md` populates the PR body with Summary / Key decisions / Test coverage / Related issues / Checklist — fill all sections.
 
 The commit history will show you what the TDD rhythm looks like in practice (`... (TDD red step)` / `... (TDD green step)` subjects). Follow that shape for your own contributions.
 
