@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import pkg from '../package.json';
 
 type CheckStatus = 'ok' | 'degraded' | 'failed';
 interface Check {
@@ -19,14 +20,28 @@ function nodeVersionCheck(): Check {
   };
 }
 
+function appVersionCheck(): Check {
+  return {
+    name: 'app_version',
+    status: 'ok',
+    message: `${pkg.name} v${pkg.version}`,
+  };
+}
+
+function overallStatus(checks: Check[]): CheckStatus {
+  if (checks.some((c) => c.status === 'failed')) return 'failed';
+  if (checks.some((c) => c.status === 'degraded')) return 'degraded';
+  return 'ok';
+}
+
 export async function buildApp(opts: FastifyServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify(opts);
 
   app.get('/health', async () => ({ status: 'ok' }));
 
   app.get('/checkSetup', async () => {
-    const check = nodeVersionCheck();
-    return { status: check.status, checks: [check] };
+    const checks = [nodeVersionCheck(), appVersionCheck()];
+    return { status: overallStatus(checks), checks };
   });
 
   return app;
