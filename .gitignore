@@ -1,1 +1,18 @@
+# Project instructions (stay local to each contributor's machine)
 CLAUDE.md
+
+# Node
+node_modules/
+dist/
+coverage/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editor & OS
+*.log
+.DS_Store
+.idea/
+.vscode/
