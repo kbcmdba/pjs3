@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/server';
 import pkg from '../package.json';
@@ -53,5 +53,62 @@ describe('GET /checkSetup', () => {
     expect(versionCheck?.status).toBe('ok');
     expect(versionCheck?.message).toContain(pkg.name);
     expect(versionCheck?.message).toContain(pkg.version);
+  });
+});
+
+describe('GET /checkSetup — config_loaded', () => {
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    vi.stubEnv('PORT', '8443');
+    vi.stubEnv('HOST', '0.0.0.0');
+    app = await buildApp();
+  });
+
+  afterEach(async () => {
+    await app.close();
+    vi.unstubAllEnvs();
+  });
+
+  it('reports ok when PORT and HOST are valid', async () => {
+    const response = await app.inject({ method: 'GET', url: '/checkSetup' });
+    const body = response.json() as Report;
+
+    const configCheck = body.checks.find((c) => c.name === 'config_loaded');
+    expect(configCheck).toBeDefined();
+    expect(configCheck?.status).toBe('ok');
+  });
+
+  it('reports failed when PORT is not a valid integer', async () => {
+    vi.stubEnv('PORT', 'not-a-number');
+
+    const response = await app.inject({ method: 'GET', url: '/checkSetup' });
+    const body = response.json() as Report;
+
+    const configCheck = body.checks.find((c) => c.name === 'config_loaded');
+    expect(configCheck?.status).toBe('failed');
+    expect(configCheck?.message).toContain('PORT');
+  });
+
+  it('reports failed when PORT is out of range', async () => {
+    vi.stubEnv('PORT', '99999');
+
+    const response = await app.inject({ method: 'GET', url: '/checkSetup' });
+    const body = response.json() as Report;
+
+    const configCheck = body.checks.find((c) => c.name === 'config_loaded');
+    expect(configCheck?.status).toBe('failed');
+    expect(configCheck?.message).toContain('PORT');
+  });
+
+  it('reports failed when HOST is empty', async () => {
+    vi.stubEnv('HOST', '');
+
+    const response = await app.inject({ method: 'GET', url: '/checkSetup' });
+    const body = response.json() as Report;
+
+    const configCheck = body.checks.find((c) => c.name === 'config_loaded');
+    expect(configCheck?.status).toBe('failed');
+    expect(configCheck?.message).toContain('HOST');
   });
 });
