@@ -112,14 +112,26 @@ The workspace/auth/role plumbing is foundational — there's no meaningful CRUD 
 | Frontend routing | React Router |
 | Dev runners | `tsx` (backend), Vite (frontend) |
 
+## Resolved Decisions
+
+- **Repo layout** — single repo with `api/` and (eventually) `web/` as sibling subdirectories. No npm workspaces until shared code actually emerges. Resolved 2026-04-23.
+- **Dev-mode email** — Mailpit (local catch-all SMTP with inbox UI) for TDD of signup verification and workspace invitations. Production provider deferred to closer to ship. Resolved 2026-04-23.
+- **Seed data strategy** — minimal seed for structurally required rows (e.g., `workspaceRole`); per-test factory fixtures for everything else. Resolved 2026-04-23.
+
 ## Open Questions (pending leader intent)
 
-1. **Repo layout** — single repo with `api/` + `web/` subdirectories, or npm workspaces monorepo? Leaning single-repo-subdirs for MVP; migrate later if shared code emerges.
-2. **Email sending** for verification, password reset, and workspace invitations — SMTP relay, Resend, Postmark, or other? Needs at least a dev-mode inbox for TDD.
-3. **Seed data strategy** — minimal seed + per-test fixtures (leaning this), vs. full demo dataset.
-4. **Deployment target** — naming only: local dev → staging → prod. Details TBD.
+Three infrastructure decisions block the auth + workspace bootstrap milestone:
+
+1. **Local MySQL approach** — Docker Compose (portable, ephemeral, contributor-friendly) vs. system-installed MySQL (closer to prod; mature for a DBA). Leaning Docker for contributor parity.
+2. **Test-database strategy** — per-test transaction rollback (fast, test-isolating) vs. per-test fresh schema (heavier, closer to reality) vs. per-suite shared with explicit cleanup. Leaning transaction rollback for TDD ergonomics.
+3. **Better-Auth schema ownership** — let Better-Auth manage its tables (user, session, account, organization, member, invitation) via its own migrations, or take full control via Drizzle Kit? Integration pattern matters here.
+
+Deferred-but-named (not blocking current work):
+
+- **Deployment target** — local dev → staging → prod; details TBD when closer to ship.
 
 ## Changelog
 
 - 2026-04-23: Initial draft with per-user tenancy (superseded).
 - 2026-04-23: Revised for workspace tenancy (ownership + sharing) per leader intent.
+- 2026-04-23: Resolved repo layout, dev-mode email, and seed-data strategy. Walking skeleton landed (api/ with passing GET /health test). Next-milestone blockers restated as infrastructure forks.
