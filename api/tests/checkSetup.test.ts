@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/server';
+import pkg from '../package.json';
 
 type CheckStatus = 'ok' | 'degraded' | 'failed';
 interface Check {
@@ -43,4 +44,14 @@ describe('GET /checkSetup', () => {
     expect(nodeCheck?.message).toContain(process.version);
   });
 
+  it('includes an app_version check with the package.json name and version', async () => {
+    const response = await app.inject({ method: 'GET', url: '/checkSetup' });
+    const body = response.json() as Report;
+
+    const versionCheck = body.checks.find((c) => c.name === 'app_version');
+    expect(versionCheck).toBeDefined();
+    expect(versionCheck?.status).toBe('ok');
+    expect(versionCheck?.message).toContain(pkg.name);
+    expect(versionCheck?.message).toContain(pkg.version);
+  });
 });
