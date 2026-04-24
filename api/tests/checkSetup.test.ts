@@ -43,19 +43,4 @@ describe('GET /checkSetup', () => {
     expect(nodeCheck?.message).toContain(process.version);
   });
 
-  // ─── Planned checks (roadmap) ──────────────────────────────────────────────
-  // Each .todo is promoted to a real test + implementation when the component
-  // it validates lands. This list IS the roadmap; if a new check is warranted,
-  // add it here first. See the red/green TDD rhythm in recent commit history
-  // for the pattern.
-  it.todo('includes a config_loaded check (env vars valid at runtime)');
-  it.todo('includes a database_reachable check');
-  it.todo('includes a migrations_current check');
-  it.todo('includes an expected_tables_exist check');
-  it.todo('includes a workspace_role_seeded check');
-  it.todo('includes an auth_configured check (Better-Auth secret + providers)');
-  it.todo('includes an email_sender_configured check (Mailpit in dev, provider in prod)');
-  it.todo('returns degraded when a non-critical check fails');
-  it.todo('returns failed when a critical check fails');
-  it.todo('distinguishes critical vs non-critical checks so degraded vs failed is meaningful');
 });
