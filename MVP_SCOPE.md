@@ -116,15 +116,16 @@ The workspace/auth/role plumbing is foundational — there's no meaningful CRUD 
 
 - **Repo layout** — single repo with `api/` and (eventually) `web/` as sibling subdirectories. No npm workspaces until shared code actually emerges. Resolved 2026-04-23.
 - **Dev-mode email** — Mailpit (local catch-all SMTP with inbox UI) for TDD of signup verification and workspace invitations. Production provider deferred to closer to ship. Resolved 2026-04-23.
-- **Seed data strategy** — minimal seed for structurally required rows (e.g., `workspaceRole`); per-test factory fixtures for everything else. Resolved 2026-04-23.
+- **Seed data strategy** — two-tier: reference data (rows the schema requires; currently `workspaceRole`) seeded once per test DB; test fixtures (`.ts` factories under `tests/fixtures/`) called per-test as needed. Both source-controlled. Resolved 2026-04-23, refined 2026-04-24.
+- **Local MySQL approach** — connect to existing `mysql2.hole` on the home network rather than Docker Compose or a fresh native install. Operationally mature, avoids dialect drift, no Docker dependency for the primary developer. External contributors point `DATABASE_URL` at their own MySQL. See `docs/adr/0001-database-setup-and-test-isolation.md`. Resolved 2026-04-24.
+- **Test-database isolation** — per-test database lifecycle: each test that touches the DB does CREATE → migrate → seed reference data → run *with real commits and real rollbacks* → DROP. Realistic commit/rollback semantics; max isolation. See ADR 0001. Resolved 2026-04-24.
+- **Forge workflow** — dual-home: Forgejo at `forgejo1.hole` is the working forge (home-network-only); GitHub `kbcmdba/pjs3` is a public mirror. PR workflow with feature branches, merge via Rebase or Merge-commit (never Squash). `CB>` / `KB>` prefix convention on Forgejo comments to make the two-voice dialogue legible despite both posts coming from `kbenton`. Resolved 2026-04-24.
 
 ## Open Questions (pending leader intent)
 
-Three infrastructure decisions block the auth + workspace bootstrap milestone:
+One infrastructure decision remains for the auth + workspace bootstrap milestone:
 
-1. **Local MySQL approach** — Docker Compose (portable, ephemeral, contributor-friendly) vs. system-installed MySQL (closer to prod; mature for a DBA). Leaning Docker for contributor parity.
-2. **Test-database strategy** — per-test transaction rollback (fast, test-isolating) vs. per-test fresh schema (heavier, closer to reality) vs. per-suite shared with explicit cleanup. Leaning transaction rollback for TDD ergonomics.
-3. **Better-Auth schema ownership** — let Better-Auth manage its tables (user, session, account, organization, member, invitation) via its own migrations, or take full control via Drizzle Kit? Integration pattern matters here.
+1. **Better-Auth schema ownership** — let Better-Auth manage its tables (user, session, account, organization, member, invitation) via its own migrations, or take full control via Drizzle Kit? Resolves when the Better-Auth integration cycle starts.
 
 Deferred-but-named (not blocking current work):
 
@@ -135,3 +136,4 @@ Deferred-but-named (not blocking current work):
 - 2026-04-23: Initial draft with per-user tenancy (superseded).
 - 2026-04-23: Revised for workspace tenancy (ownership + sharing) per leader intent.
 - 2026-04-23: Resolved repo layout, dev-mode email, and seed-data strategy. Walking skeleton landed (api/ with passing GET /health test). Next-milestone blockers restated as infrastructure forks.
+- 2026-04-24: PR #9 merged (config module + `config_loaded` check, `loadConfig` env input made explicit per review). Forgejo issues #1–#10 filed for the `/checkSetup` backlog. Resolved local MySQL approach (use existing `mysql2.hole`) and test-database isolation (per-test lifecycle with real commits/rollbacks); ADR 0001 captures both. Forge workflow (Forgejo primary + GitHub mirror, `CB>`/`KB>` prefix convention) resolved and documented.

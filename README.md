@@ -44,12 +44,16 @@ PORT=9000 HOST=127.0.0.1 npm run dev
 ```
 pjs3/
 ├── api/              Backend (Fastify + Vitest + TypeScript)
+├── docs/
+│   └── adr/          Architecture Decision Records (start with ADR 0001)
 ├── MVP_SCOPE.md      Initial-release scope, committed stack, open questions
 ├── LICENSE           GPLv2
 └── README.md         This file
 ```
 
 A `web/` frontend (React + Vite) will land alongside `api/` once the backend has enough to show. No npm workspaces — each subdirectory is independent until shared code actually emerges.
+
+Substantive architectural decisions land in [`docs/adr/`](docs/adr/) before the code that implements them, so the rationale is captured up front rather than inferred from a diff months later.
 
 ## Contributing
 
