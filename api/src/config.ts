@@ -7,10 +7,10 @@ export interface Config {
   errors: string[];
 }
 
-export function loadConfig(): Config {
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const errors: string[] = [];
 
-  const rawPort = process.env.PORT ?? String(DEFAULT_PORT);
+  const rawPort = env.PORT ?? String(DEFAULT_PORT);
   const parsedPort = Number(rawPort);
   let port = parsedPort;
   if (!Number.isInteger(parsedPort) || parsedPort <= 0 || parsedPort > 65535) {
@@ -18,7 +18,7 @@ export function loadConfig(): Config {
     port = DEFAULT_PORT;
   }
 
-  const rawHost = process.env.HOST ?? DEFAULT_HOST;
+  const rawHost = env.HOST ?? DEFAULT_HOST;
   let host = rawHost;
   if (rawHost.length === 0) {
     errors.push('HOST is empty.');
