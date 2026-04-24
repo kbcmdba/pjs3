@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import pkg from '../package.json';
+import { loadConfig } from './config';
 
 type CheckStatus = 'ok' | 'degraded' | 'failed';
 interface Check {
@@ -28,6 +29,22 @@ function appVersionCheck(): Check {
   };
 }
 
+function configLoadedCheck(): Check {
+  const config = loadConfig();
+  if (config.errors.length === 0) {
+    return {
+      name: 'config_loaded',
+      status: 'ok',
+      message: `PORT=${config.port}, HOST=${config.host}`,
+    };
+  }
+  return {
+    name: 'config_loaded',
+    status: 'failed',
+    message: config.errors.join(' '),
+  };
+}
+
 function overallStatus(checks: Check[]): CheckStatus {
   if (checks.some((c) => c.status === 'failed')) return 'failed';
   if (checks.some((c) => c.status === 'degraded')) return 'degraded';
@@ -40,7 +57,7 @@ export async function buildApp(opts: FastifyServerOptions = {}): Promise<Fastify
   app.get('/health', async () => ({ status: 'ok' }));
 
   app.get('/checkSetup', async () => {
-    const checks = [nodeVersionCheck(), appVersionCheck()];
+    const checks = [nodeVersionCheck(), appVersionCheck(), configLoadedCheck()];
     return { status: overallStatus(checks), checks };
   });
 
