@@ -1,0 +1,63 @@
+{
+  "version": "5",
+  "dialect": "mysql",
+  "id": "23d2841b-ec06-4144-87eb-e1b9d46fb462",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "workspaceRole": {
+      "name": "workspaceRole",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "value": {
+          "name": "value",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sortKey": {
+          "name": "sortKey",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "workspaceRole_id": {
+          "name": "workspaceRole_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {
+        "workspaceRole_value_unique": {
+          "name": "workspaceRole_value_unique",
+          "columns": [
+            "value"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    }
+  },
+  "views": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "tables": {},
+    "indexes": {}
+  }
+}

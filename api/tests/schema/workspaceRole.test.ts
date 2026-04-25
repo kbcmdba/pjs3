@@ -26,11 +26,7 @@ describe('workspaceRole schema', () => {
     expect(value).toBeDefined();
     expect(value?.notNull).toBe(true);
     expect(value?.getSQLType().toLowerCase()).toBe('varchar(64)');
-
-    const hasUnique = config.uniqueConstraints?.some((u) =>
-      u.columns.some((c) => c.name === 'value'),
-    );
-    expect(hasUnique).toBe(true);
+    expect(value?.isUnique).toBe(true);
   });
 
   it('sortKey is a non-null unsigned int', () => {
