@@ -1,7 +1,7 @@
 # ADR 0001: Database setup and test isolation strategy
 
 - **Status:** Accepted
-- **Date:** 2026-04-24 (amended 2026-04-25)
+- **Date:** 2026-04-24 (amended same day)
 - **Decision-makers:** kbenton; Claude (collaborator on this project)
 
 ## Context
@@ -80,42 +80,54 @@ A two-tier model, both source-controlled:
 
 Both are committed code. A reader navigating from `tests/jobs.test.ts` → `tests/fixtures/two-workspaces-three-jobs.ts` can see the exact scenario the test ran against.
 
-### Forensic fixture log (amendment 2026-04-25)
+### Forensic fixture log
 
 When a test fails and the per-test database is preserved (planned `KEEP_FAILED_DBS=1` flag), the operator inspecting that database needs to know **which fixtures contributed which rows**. Without that breadcrumb, partial state is hard to trace — especially when a fixture crashes mid-load.
 
-The test bootstrap creates a `_pjs3_test_fixture_log` table alongside reference data:
+The test bootstrap creates two harness-internal tables alongside reference data:
 
 ```sql
+CREATE TABLE _pjs3_test_fixture_catalog (
+  id    INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name  VARCHAR(255) NOT NULL,
+  UNIQUE KEY (name)
+);
+
 CREATE TABLE _pjs3_test_fixture_log (
-  id            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  fixture_name  VARCHAR(255) NOT NULL,
+  id            INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  fixture_id    INT UNSIGNED NOT NULL,
   test_name     VARCHAR(255) NULL,
   created_at    DATETIME(6) NOT NULL,    -- when fixture load STARTED
-  load_time_ms  INT NULL,                -- NULL = load never completed
-  INDEX (created_at)
+  load_time_ms  INT UNSIGNED NULL,       -- NULL = load never completed
+  FOREIGN KEY (fixture_id) REFERENCES _pjs3_test_fixture_catalog(id)
 );
 ```
 
-Underscore prefix marks the table as test-harness internal, not domain. Fixtures call into a wrapper rather than logging themselves directly:
+Underscore prefix marks both tables as test-harness internal, not domain. The fixture *catalog* normalizes fixture identity — a forensic query like "all log entries for the `two-workspaces-three-jobs` fixture" joins on an integer FK rather than scanning a varchar column. `test_name` stays as VARCHAR because test names are runtime strings (Vitest's `currentTestName`) — a finite catalog of them isn't knowable up front and renames would orphan rows.
+
+`UNSIGNED` on `id` and `load_time_ms` expresses the invariant in the schema: neither value can ever be negative.
+
+Fixtures call into a wrapper rather than logging themselves directly:
 
 ```typescript
 // tests/fixtures/_harness.ts
-export async function withFixture<T>(
+export async function withFixture<TDb, T>(
   name: string,
-  db: Database,
-  apply: (db: Database) => Promise<T>,
+  db: TDb,                               // shape settled in PR 3
+  apply: (db: TDb) => Promise<T>,
 ): Promise<T> {
   const testName = expect.getState().currentTestName ?? null;
   const createdAt = new Date();
 
+  const fixtureId = await upsertFixtureName(db, name);
+
   const [insertResult] = await db.execute(
     `INSERT INTO _pjs3_test_fixture_log
-       (fixture_name, test_name, created_at)
+       (fixture_id, test_name, created_at)
      VALUES (?, ?, ?)`,
-    [name, testName, createdAt],
+    [fixtureId, testName, createdAt],
   );
-  const logId = (insertResult as { insertId: number }).insertId;
+  const { insertId: logId } = insertResult;
 
   const startMs = performance.now();
   const result = await apply(db);
@@ -130,15 +142,21 @@ export async function withFixture<T>(
 }
 ```
 
-Tests then call `await withFixture('two-workspaces-three-jobs', db, applyTwoWorkspacesThreeJobs)` instead of calling the apply factory directly. Fixtures stay focused on data; the wrapper handles logging consistently.
+`TDb` is generic because PR 3 hasn't yet settled whether `db` is a Drizzle handle or a raw `mysql2` connection — the wrapper's contract works either way. `upsertFixtureName` is a one-line `INSERT ... ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)` against the catalog (returns the existing id if the name already exists, inserts otherwise).
+
+Tests call `await withFixture('two-workspaces-three-jobs', db, applyTwoWorkspacesThreeJobs)` instead of calling the apply factory directly. Fixtures stay focused on data; the wrapper handles logging consistently.
 
 #### Why INSERT-then-UPDATE rather than INSERT-only
 
-If `apply()` throws partway through, an INSERT-only pattern leaves no log entry — the post-crash database shows partial data with no breadcrumb. INSERT-first-then-UPDATE means a crashed load leaves a row with `load_time_ms IS NULL`, which is itself the forensic signal: "started but didn't finish." `SELECT fixture_name, created_at FROM _pjs3_test_fixture_log WHERE load_time_ms IS NULL` answers "what was running when this DB went off-plan?"
+If `apply()` throws partway through, an INSERT-only pattern leaves no log entry — the post-crash database shows partial data with no breadcrumb. INSERT-first-then-UPDATE means a crashed load leaves a row with `load_time_ms IS NULL`, which is itself the forensic signal: "started but didn't finish." `SELECT c.name, l.created_at FROM _pjs3_test_fixture_log l JOIN _pjs3_test_fixture_catalog c ON c.id = l.fixture_id WHERE l.load_time_ms IS NULL` answers "what was running when this DB went off-plan?"
 
 #### Why two timing fields rather than one
 
 `created_at` anchors the wall-clock moment the load began (correlates with test output, git commits, log lines elsewhere). `load_time_ms` captures duration, computed via `performance.now()` to be monotonic and immune to system-clock jitter mid-load. Together they reconstruct "data started landing at T, finished by T + load_time_ms" — both anchors are useful and answer different forensic questions.
+
+#### Why a fixture catalog table rather than a varchar column
+
+`fixture_name VARCHAR(255)` in the log table would work, but every forensic lookup ("show me all loads of fixture X") would scan or seek on a string column. Normalizing into a small catalog (id, name) keeps the log slim and makes joins indexable on integers. It also enforces fixture-name uniqueness through the catalog's `UNIQUE KEY (name)` rather than relying on convention. The cost is an extra table and an upsert per `withFixture` call — both negligible in the test-harness path.
 
 #### What's deliberately not in the schema
 
@@ -176,4 +194,4 @@ No `metadata JSON` column. Tempting for "let each fixture stash extra context," 
 
 - PJS2's `~/.my.claude.cnf` credential pattern (deprecated in PJS3 in favor of `DATABASE_URL` + Ansible Vault).
 - Forgejo issues #1–#10 (the `/checkSetup` backlog and follow-ups).
-- Project memory: `feedback_orm_stance`, `project_data_modeling`, `project_forge_workflow`.
+- The project's normalization stance and ORM posture inform the no-JSON / fixture-catalog choices above.
