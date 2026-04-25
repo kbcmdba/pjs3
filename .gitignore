@@ -16,3 +16,10 @@ coverage/
 .DS_Store
 .idea/
 .vscode/
+*.swp
+*.swo
+
+# Local scratch files (drafts, SQL snippets, anything not meant for the repo)
+tmp.*
+*.tmp
+tmp/
