@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "23d2841b-ec06-4144-87eb-e1b9d46fb462",
+  "id": "217f51b3-40d3-479a-8b03-0f285a25920d",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "workspaceRole": {
@@ -14,8 +14,8 @@
           "notNull": true,
           "autoincrement": true
         },
-        "value": {
-          "name": "value",
+        "role": {
+          "name": "role",
           "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true,
@@ -40,10 +40,10 @@
         }
       },
       "uniqueConstraints": {
-        "workspaceRole_value_unique": {
-          "name": "workspaceRole_value_unique",
+        "workspaceRole_role_unique": {
+          "name": "workspaceRole_role_unique",
           "columns": [
-            "value"
+            "role"
           ]
         }
       },

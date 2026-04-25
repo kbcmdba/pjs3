@@ -6,11 +6,11 @@ describe('workspaceRole schema', () => {
   const config = getTableConfig(workspaceRoleTable);
   const byName = (name: string) => config.columns.find((c) => c.name === name);
 
-  it('declares exactly id, value, sortKey columns', () => {
+  it('declares exactly id, role, sortKey columns', () => {
     expect(config.columns.map((c) => c.name).sort()).toEqual([
       'id',
+      'role',
       'sortKey',
-      'value',
     ]);
   });
 
@@ -21,12 +21,12 @@ describe('workspaceRole schema', () => {
     expect(id?.getSQLType().toLowerCase()).toMatch(/^int unsigned$/);
   });
 
-  it('value is a non-null varchar(64) with a unique constraint', () => {
-    const value = byName('value');
-    expect(value).toBeDefined();
-    expect(value?.notNull).toBe(true);
-    expect(value?.getSQLType().toLowerCase()).toBe('varchar(64)');
-    expect(value?.isUnique).toBe(true);
+  it('role is a non-null varchar(64) with a unique constraint', () => {
+    const role = byName('role');
+    expect(role).toBeDefined();
+    expect(role?.notNull).toBe(true);
+    expect(role?.getSQLType().toLowerCase()).toBe('varchar(64)');
+    expect(role?.isUnique).toBe(true);
   });
 
   it('sortKey is a non-null unsigned int', () => {
