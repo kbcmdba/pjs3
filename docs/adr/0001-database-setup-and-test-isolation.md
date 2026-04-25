@@ -1,7 +1,7 @@
 # ADR 0001: Database setup and test isolation strategy
 
 - **Status:** Accepted
-- **Date:** 2026-04-24 (amended same day)
+- **Date:** 2026-04-24 (amended 2026-04-24, 2026-04-25)
 - **Decision-makers:** kbenton; Claude (collaborator on this project)
 
 ## Context
@@ -64,12 +64,39 @@ The cost is per-test setup overhead (~100ms for `CREATE` + migrations + seed). A
 
 Two test users on `mysql2.hole`, set up once via the Ansible MySQL role:
 
-- **`pjs3_test_admin`** — `CREATE`, `DROP` on `` `pjs3\_test\_%`.* `` namespace. Used only by the test bootstrap to create and drop per-test databases.
-- **`pjs3_test`** — `ALL` on `` `pjs3\_test\_%`.* `` namespace. Used by tests within the per-test DB.
+- **`pjs3_test_bootstrap`** — `CREATE`, `DROP` on `` `pjs3\_test\_%`.* `` namespace. Used only by the test bootstrap to create and drop per-test databases. (Originally proposed as `pjs3_test_admin`; renamed because "admin" connoted *more* privilege than this user actually holds, the opposite of reality.)
+- **`pjs3_test`** — `ALL` on `` `pjs3\_test\_%`.* `` namespace. Used by tests within the per-test DB for migrations and test queries.
+
+Both users are created with **host restrictions** in `IP/netmask` form -- not `@'%'`, which would allow connections from any host on any network. The provisioned grants look like:
+
+```sql
+CREATE USER 'pjs3_test_bootstrap'@'192.168.1.0/255.255.255.0' IDENTIFIED BY '<from-vault>';
+GRANT CREATE, DROP ON `pjs3\_test\_%`.* TO 'pjs3_test_bootstrap'@'192.168.1.0/255.255.255.0';
+
+CREATE USER 'pjs3_test'@'192.168.1.0/255.255.255.0' IDENTIFIED BY '<from-vault>';
+GRANT ALL ON `pjs3\_test\_%`.* TO 'pjs3_test'@'192.168.1.0/255.255.255.0';
+
+FLUSH PRIVILEGES;
+```
+
+The `192.168.1.0/255.255.255.0` is a documented placeholder; the actual provisioning uses the real internal subnet (kept out of committed docs to avoid leaking topology). `IP/netmask` form is preferred over wildcard host patterns like `'10.0.0.%'` because it's unambiguous -- no risk of a misplaced wildcard digit silently widening the grant.
 
 The wildcard pattern uses backslash-escaped underscores so it matches `pjs3_test_xyz` strictly, not stray names like `pjs3atestbxyz`.
 
 A separate production user (`pjs3_app` or similar) holds minimal CRUD privileges on the production `pjs3` database. Never used in tests.
+
+#### Why the privilege split (and not one user with `ALL`)
+
+`pjs3_test_bootstrap` is restricted to `CREATE, DROP` because that's all it needs -- spinning up empty per-test DBs and tearing them down. Migrations and test queries inside the DB run as `pjs3_test`, which has full `ALL` on the namespace. Principle of least privilege: a compromised bootstrap credential can churn empty databases (annoying, recoverable), but cannot read or modify any test data sitting in a preserved-on-failure database. Combining both into one `ALL`-granted user would be operationally simpler but loses the boundary.
+
+#### Note on this section's history
+
+The original draft of this ADR (2026-04-24) specified `@'%'` host patterns and named the elevated user `pjs3_test_admin`. Both were corrected on 2026-04-25:
+
+- **`@'%'` → `@'IP/netmask'`** because `@'%'` allows connections from anywhere, which is wrong on a home-network DB box. Documented placeholder is `192.168.1.0/255.255.255.0`.
+- **`pjs3_test_admin` → `pjs3_test_bootstrap`** because the "admin" name suggested broader privilege than the user actually holds; "bootstrap" describes its scope (per-test DB lifecycle).
+
+Captured here rather than silently overwriting because the original mistake illustrates the principles future schema work should follow.
 
 ### Reference data and test fixtures
 
