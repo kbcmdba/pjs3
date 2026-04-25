@@ -148,3 +148,39 @@ describe('GET /checkSetup — database_reachable', () => {
     expect(dbCheck?.status).toBe('failed');
   });
 });
+
+describe('GET /checkSetup — migrations_current', () => {
+  let app: FastifyInstance;
+
+  beforeEach(async () => {
+    app = await buildApp();
+  });
+
+  afterEach(async () => {
+    await app.close();
+    vi.unstubAllEnvs();
+  });
+
+  it('reports failed when DATABASE_URL is unset', async () => {
+    vi.stubEnv('DATABASE_URL', '');
+
+    const response = await app.inject({ method: 'GET', url: '/checkSetup' });
+    const body = response.json() as Report;
+
+    const check = body.checks.find((c) => c.name === 'migrations_current');
+    expect(check).toBeDefined();
+    expect(check?.status).toBe('failed');
+    expect(check?.message).toContain('DATABASE_URL');
+  });
+
+  it('reports failed when DATABASE_URL points at an unreachable host', async () => {
+    vi.stubEnv('DATABASE_URL', 'mysql://nope:nope@127.0.0.1:1/nodb');
+
+    const response = await app.inject({ method: 'GET', url: '/checkSetup' });
+    const body = response.json() as Report;
+
+    const check = body.checks.find((c) => c.name === 'migrations_current');
+    expect(check).toBeDefined();
+    expect(check?.status).toBe('failed');
+  });
+});

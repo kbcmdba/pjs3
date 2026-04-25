@@ -37,3 +37,26 @@ describe('GET /checkSetup database_reachable - integration', () => {
     });
   });
 });
+
+describe('GET /checkSetup migrations_current - integration', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('reports ok when the test DB has all journal migrations applied', async () => {
+    await withTestDb(async (databaseUrl) => {
+      vi.stubEnv('DATABASE_URL', databaseUrl);
+
+      const app = await buildApp();
+      try {
+        const response = await app.inject({ method: 'GET', url: '/checkSetup' });
+        const body = response.json() as Report;
+        const check = body.checks.find((c) => c.name === 'migrations_current');
+        expect(check).toBeDefined();
+        expect(check?.status).toBe('ok');
+      } finally {
+        await app.close();
+      }
+    });
+  });
+});
