@@ -33,7 +33,7 @@ To run the dev server:
 npm run dev
 ```
 
-Listens on port **8443** by default. Override via env vars (see `api/.env.example`):
+Listens on port **8443** by default. Override via env vars (see `api/env.example`):
 
 ```sh
 PORT=9000 HOST=127.0.0.1 npm run dev
