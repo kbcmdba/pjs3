@@ -1,7 +1,7 @@
 # ADR 0001: Database setup and test isolation strategy
 
 - **Status:** Accepted
-- **Date:** 2026-04-24
+- **Date:** 2026-04-24 (amended 2026-04-25)
 - **Decision-makers:** kbenton; Claude (collaborator on this project)
 
 ## Context
@@ -79,6 +79,70 @@ A two-tier model, both source-controlled:
 - **Test fixtures** — discrete, source-controlled scenarios. Each fixture is a `.ts` file under `tests/fixtures/<scenario>.ts` that exports an `apply<Scenario>(db) → references` factory. Tests import the fixture they need; the factory inserts known data and returns typed references the test can use.
 
 Both are committed code. A reader navigating from `tests/jobs.test.ts` → `tests/fixtures/two-workspaces-three-jobs.ts` can see the exact scenario the test ran against.
+
+### Forensic fixture log (amendment 2026-04-25)
+
+When a test fails and the per-test database is preserved (planned `KEEP_FAILED_DBS=1` flag), the operator inspecting that database needs to know **which fixtures contributed which rows**. Without that breadcrumb, partial state is hard to trace — especially when a fixture crashes mid-load.
+
+The test bootstrap creates a `_pjs3_test_fixture_log` table alongside reference data:
+
+```sql
+CREATE TABLE _pjs3_test_fixture_log (
+  id            INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  fixture_name  VARCHAR(255) NOT NULL,
+  test_name     VARCHAR(255) NULL,
+  created_at    DATETIME(6) NOT NULL,    -- when fixture load STARTED
+  load_time_ms  INT NULL,                -- NULL = load never completed
+  INDEX (created_at)
+);
+```
+
+Underscore prefix marks the table as test-harness internal, not domain. Fixtures call into a wrapper rather than logging themselves directly:
+
+```typescript
+// tests/fixtures/_harness.ts
+export async function withFixture<T>(
+  name: string,
+  db: Database,
+  apply: (db: Database) => Promise<T>,
+): Promise<T> {
+  const testName = expect.getState().currentTestName ?? null;
+  const createdAt = new Date();
+
+  const [insertResult] = await db.execute(
+    `INSERT INTO _pjs3_test_fixture_log
+       (fixture_name, test_name, created_at)
+     VALUES (?, ?, ?)`,
+    [name, testName, createdAt],
+  );
+  const logId = (insertResult as { insertId: number }).insertId;
+
+  const startMs = performance.now();
+  const result = await apply(db);
+  const loadTimeMs = Math.round(performance.now() - startMs);
+
+  await db.execute(
+    `UPDATE _pjs3_test_fixture_log SET load_time_ms = ? WHERE id = ?`,
+    [loadTimeMs, logId],
+  );
+
+  return result;
+}
+```
+
+Tests then call `await withFixture('two-workspaces-three-jobs', db, applyTwoWorkspacesThreeJobs)` instead of calling the apply factory directly. Fixtures stay focused on data; the wrapper handles logging consistently.
+
+#### Why INSERT-then-UPDATE rather than INSERT-only
+
+If `apply()` throws partway through, an INSERT-only pattern leaves no log entry — the post-crash database shows partial data with no breadcrumb. INSERT-first-then-UPDATE means a crashed load leaves a row with `load_time_ms IS NULL`, which is itself the forensic signal: "started but didn't finish." `SELECT fixture_name, created_at FROM _pjs3_test_fixture_log WHERE load_time_ms IS NULL` answers "what was running when this DB went off-plan?"
+
+#### Why two timing fields rather than one
+
+`created_at` anchors the wall-clock moment the load began (correlates with test output, git commits, log lines elsewhere). `load_time_ms` captures duration, computed via `performance.now()` to be monotonic and immune to system-clock jitter mid-load. Together they reconstruct "data started landing at T, finished by T + load_time_ms" — both anchors are useful and answer different forensic questions.
+
+#### What's deliberately not in the schema
+
+No `metadata JSON` column. Tempting for "let each fixture stash extra context," but this project's schema-conventions stance opposes JSON-as-storage. If a fixture needs to record extras, it inserts into its own structured table — the forensic log stays relational and flat.
 
 ## Consequences
 
