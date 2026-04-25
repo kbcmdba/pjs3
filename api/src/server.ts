@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 import pkg from '../package.json';
 import { loadConfig } from './config';
 import { pingDatabase } from './db';
+import { checkMigrationsCurrent } from './migrations';
 
 type CheckStatus = 'ok' | 'degraded' | 'failed';
 interface Check {
@@ -63,6 +64,23 @@ async function databaseReachableCheck(): Promise<Check> {
   };
 }
 
+async function migrationsCurrentCheck(): Promise<Check> {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    return {
+      name: 'migrations_current',
+      status: 'failed',
+      message: 'DATABASE_URL is not set',
+    };
+  }
+  const result = await checkMigrationsCurrent(databaseUrl);
+  return {
+    name: 'migrations_current',
+    status: result.current ? 'ok' : 'failed',
+    message: result.message,
+  };
+}
+
 function overallStatus(checks: Check[]): CheckStatus {
   if (checks.some((c) => c.status === 'failed')) return 'failed';
   if (checks.some((c) => c.status === 'degraded')) return 'degraded';
@@ -80,6 +98,7 @@ export async function buildApp(opts: FastifyServerOptions = {}): Promise<Fastify
       appVersionCheck(),
       configLoadedCheck(),
       await databaseReachableCheck(),
+      await migrationsCurrentCheck(),
     ];
     return { status: overallStatus(checks), checks };
   });
