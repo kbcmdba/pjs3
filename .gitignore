@@ -20,5 +20,6 @@ coverage/
 *.swo
 
 # Local scratch files (drafts, SQL snippets, anything not meant for the repo)
-tmp.txt
+tmp.*
+*.tmp
 tmp/
