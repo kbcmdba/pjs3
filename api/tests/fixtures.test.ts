@@ -44,13 +44,13 @@ describe('withFixture', () => {
 
         const [logRows] = await conn.query(
           'SELECT * FROM `_pjs3_test_fixture_log` WHERE fixture_id = ?',
-          [catalog[0].id],
+          [catalog[0]!.id],
         );
         const log = logRows as FixtureLogRow[];
         expect(log).toHaveLength(1);
-        expect(log[0].load_time_ms).not.toBeNull();
-        expect(log[0].load_time_ms).toBeGreaterThanOrEqual(0);
-        expect(log[0].test_name).toContain('completed log row');
+        expect(log[0]!.load_time_ms).not.toBeNull();
+        expect(log[0]!.load_time_ms).toBeGreaterThanOrEqual(0);
+        expect(log[0]!.test_name).toContain('completed log row');
       } finally {
         await conn.end();
       }
@@ -76,11 +76,11 @@ describe('withFixture', () => {
 
         const [logRows] = await conn.query(
           'SELECT * FROM `_pjs3_test_fixture_log` WHERE fixture_id = ?',
-          [catalog[0].id],
+          [catalog[0]!.id],
         );
         const log = logRows as FixtureLogRow[];
         expect(log).toHaveLength(1);
-        expect(log[0].load_time_ms).toBeNull();
+        expect(log[0]!.load_time_ms).toBeNull();
       } finally {
         await conn.end();
       }
@@ -106,7 +106,7 @@ describe('withFixture', () => {
         const [logRows] = await conn.query(
           'SELECT COUNT(*) AS cnt FROM `_pjs3_test_fixture_log`',
         );
-        expect((logRows as Array<{ cnt: number }>)[0].cnt).toBe(2);
+        expect((logRows as Array<{ cnt: number }>)[0]!.cnt).toBe(2);
       } finally {
         await conn.end();
       }

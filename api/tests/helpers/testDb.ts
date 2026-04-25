@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/mysql2';
 import { migrate } from 'drizzle-orm/mysql2/migrator';
 import mysql from 'mysql2/promise';
 import { seedReferenceData } from '../../src/seed/referenceData';
+import { createHarnessTables } from '../fixtures/_harness';
 
 const MIGRATIONS_FOLDER = './drizzle';
 const CONNECT_TIMEOUT_MS = 5000;
@@ -55,6 +56,7 @@ export async function withTestDb<T>(
       const db = drizzle(userConn);
       await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
       await seedReferenceData(db);
+      await createHarnessTables(userConn);
     } finally {
       await userConn.end();
     }
