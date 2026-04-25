@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import pkg from '../package.json';
 import { loadConfig } from './config';
+import { pingDatabase } from './db';
 
 type CheckStatus = 'ok' | 'degraded' | 'failed';
 interface Check {
@@ -45,6 +46,23 @@ function configLoadedCheck(): Check {
   };
 }
 
+async function databaseReachableCheck(): Promise<Check> {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    return {
+      name: 'database_reachable',
+      status: 'failed',
+      message: 'DATABASE_URL is not set',
+    };
+  }
+  const result = await pingDatabase(databaseUrl);
+  return {
+    name: 'database_reachable',
+    status: result.ok ? 'ok' : 'failed',
+    message: result.message,
+  };
+}
+
 function overallStatus(checks: Check[]): CheckStatus {
   if (checks.some((c) => c.status === 'failed')) return 'failed';
   if (checks.some((c) => c.status === 'degraded')) return 'degraded';
@@ -57,7 +75,12 @@ export async function buildApp(opts: FastifyServerOptions = {}): Promise<Fastify
   app.get('/health', async () => ({ status: 'ok' }));
 
   app.get('/checkSetup', async () => {
-    const checks = [nodeVersionCheck(), appVersionCheck(), configLoadedCheck()];
+    const checks = [
+      nodeVersionCheck(),
+      appVersionCheck(),
+      configLoadedCheck(),
+      await databaseReachableCheck(),
+    ];
     return { status: overallStatus(checks), checks };
   });
 

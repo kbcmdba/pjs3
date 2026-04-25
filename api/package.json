@@ -16,7 +16,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "fastify": "^5"
+    "fastify": "^5",
+    "mysql2": "^3.22.2"
   },
   "devDependencies": {
     "@types/node": "^22",
