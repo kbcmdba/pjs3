@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import mysql from 'mysql2/promise';
+import { parseDatabaseUrl } from './db';
 
 const JOURNAL_PATH = join(process.cwd(), 'drizzle', 'meta', '_journal.json');
 const CONNECT_TIMEOUT_MS = 2000;
@@ -14,18 +15,6 @@ export interface MigrationStatus {
   applied: number;
   current: boolean;
   message: string;
-}
-
-function parseUrl(databaseUrl: string) {
-  const url = new URL(databaseUrl);
-  return {
-    host: url.hostname,
-    port: url.port ? Number(url.port) : 3306,
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: url.pathname.slice(1) || undefined,
-    connectTimeout: CONNECT_TIMEOUT_MS,
-  };
 }
 
 function readJournalCount(): { count: number; error?: string } {
@@ -48,7 +37,7 @@ export async function checkMigrationsCurrent(databaseUrl: string): Promise<Migra
 
   let connection: mysql.Connection | undefined;
   try {
-    connection = await mysql.createConnection(parseUrl(databaseUrl));
+    connection = await mysql.createConnection(parseDatabaseUrl(databaseUrl, CONNECT_TIMEOUT_MS));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return {

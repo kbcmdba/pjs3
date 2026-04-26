@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import mysql from 'mysql2/promise';
+import { parseDatabaseUrl } from '../src/db';
 import { withTestDb } from './helpers/testDb';
 import { withFixture } from './fixtures/_harness';
 import { applyWithCollaboratorRole } from './fixtures/withCollaboratorRole';
@@ -17,21 +18,10 @@ interface FixtureCatalogRow {
   name: string;
 }
 
-function parseUrl(databaseUrl: string) {
-  const url = new URL(databaseUrl);
-  return {
-    host: url.hostname,
-    port: url.port ? Number(url.port) : 3306,
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: url.pathname.slice(1) || undefined,
-  };
-}
-
 describe('withFixture', () => {
   it('inserts the fixture into the catalog and writes a completed log row', async () => {
     await withTestDb(async (databaseUrl) => {
-      const conn = await mysql.createConnection(parseUrl(databaseUrl));
+      const conn = await mysql.createConnection(parseDatabaseUrl(databaseUrl));
       try {
         await withFixture('with-collaborator-role', conn, applyWithCollaboratorRole);
 
@@ -59,7 +49,7 @@ describe('withFixture', () => {
 
   it('records load_time_ms as NULL when the fixture throws mid-load', async () => {
     await withTestDb(async (databaseUrl) => {
-      const conn = await mysql.createConnection(parseUrl(databaseUrl));
+      const conn = await mysql.createConnection(parseDatabaseUrl(databaseUrl));
       try {
         await expect(
           withFixture('failing-fixture', conn, async () => {
@@ -89,7 +79,7 @@ describe('withFixture', () => {
 
   it('upserts the catalog when a fixture is loaded twice in the same DB', async () => {
     await withTestDb(async (databaseUrl) => {
-      const conn = await mysql.createConnection(parseUrl(databaseUrl));
+      const conn = await mysql.createConnection(parseDatabaseUrl(databaseUrl));
       try {
         await withFixture('with-collaborator-role', conn, applyWithCollaboratorRole);
         // Second call: should reuse catalog entry, add a second log row.

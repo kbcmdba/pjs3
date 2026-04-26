@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { drizzle } from 'drizzle-orm/mysql2';
 import { migrate } from 'drizzle-orm/mysql2/migrator';
 import mysql from 'mysql2/promise';
+import { parseDatabaseUrl } from '../../src/db';
 import { seedReferenceData } from '../../src/seed/referenceData';
 import { createHarnessTables } from '../fixtures/_harness';
 
@@ -15,18 +16,6 @@ function randomDbName(): string {
 function appendDb(baseUrl: string, dbName: string): string {
   const trimmed = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
   return `${trimmed}${dbName}`;
-}
-
-function parseUrl(databaseUrl: string) {
-  const url = new URL(databaseUrl);
-  return {
-    host: url.hostname,
-    port: url.port ? Number(url.port) : 3306,
-    user: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    database: url.pathname.slice(1) || undefined,
-    connectTimeout: CONNECT_TIMEOUT_MS,
-  };
 }
 
 export async function withTestDb<T>(
@@ -43,7 +32,7 @@ export async function withTestDb<T>(
   const dbName = randomDbName();
   const userUrl = appendDb(userUrlBase, dbName);
 
-  const bootstrapConn = await mysql.createConnection(parseUrl(bootstrapUrl));
+  const bootstrapConn = await mysql.createConnection(parseDatabaseUrl(bootstrapUrl, CONNECT_TIMEOUT_MS));
   try {
     await bootstrapConn.query(`CREATE DATABASE \`${dbName}\``);
   } finally {
@@ -51,7 +40,7 @@ export async function withTestDb<T>(
   }
 
   try {
-    const userConn = await mysql.createConnection(parseUrl(userUrl));
+    const userConn = await mysql.createConnection(parseDatabaseUrl(userUrl, CONNECT_TIMEOUT_MS));
     try {
       const db = drizzle(userConn);
       await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
@@ -63,7 +52,7 @@ export async function withTestDb<T>(
 
     return await fn(userUrl);
   } finally {
-    const dropConn = await mysql.createConnection(parseUrl(bootstrapUrl));
+    const dropConn = await mysql.createConnection(parseDatabaseUrl(bootstrapUrl, CONNECT_TIMEOUT_MS));
     try {
       await dropConn.query(`DROP DATABASE \`${dbName}\``);
     } finally {
