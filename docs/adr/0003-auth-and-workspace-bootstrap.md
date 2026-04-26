@@ -26,7 +26,7 @@ Better-Auth's tables (`user`, `session`, `account`, `organization`, `member`, `i
 
 ### Email verification: hard gate
 
-A user who has signed up but not yet verified their email **cannot perform any action that writes to the database**. Specifically: their personal workspace is **not** created at signup, and no `WorkspaceMember` row is created. These materialize **atomically** at first verified sign-in.
+A user who has signed up but not yet verified their email **cannot perform any action that writes to the database beyond the unverified `user` row itself**. Specifically: their personal workspace is **not** created at signup, and no `WorkspaceMember` row is created. These materialize **atomically** at first verified sign-in.
 
 **Why:** Prevents pollution of the DB with bogus data from never-confirmed signups (auto-spam, typos, abandoned signups). The DB only holds workspace records for users we know are reachable.
 
@@ -42,11 +42,13 @@ The flow:
    - JWT issued (see "Login" below).
 7. Subsequent sign-ins skip the workspace-creation step (already exists).
 
+**Unverified-row TTL: 24 hours.** A periodic cleanup task purges `user` rows that remain unverified for more than 24h after creation. Bounds DB pollution from abandoned signups even though the row exists briefly. The cleanup mechanism (cron job, scheduled task, or manual sweep) settles when the cleanup task is built; the policy is the 24h cap.
+
 ### Sessions: JWT, configurable TTL, 4h default
 
 JWT is the session bearer. PJS3 is API-first — long-term, the same backend serves the web UI and external API consumers, and JWT is the natural fit for both audiences without two parallel session models.
 
-**TTL:** default 4 hours, **user-configurable** via a setting on `user` (e.g., `sessionTtlHours INT UNSIGNED DEFAULT 4`). Users with stricter security needs can shorten; users with longer working windows can extend up to a cap (provisionally 168h = 7d; cap committed when the user-settings UI lands).
+**TTL:** default 4 hours **of idle time** — activity (any authenticated request) resets the timer. So a user actively working stays signed in indefinitely; a user who walks away gets logged out 4 hours after their last action. **User-configurable** via a setting on `user` (e.g., `sessionIdleTtlMinutes INT UNSIGNED DEFAULT 240`). The unit is **minutes** so users can pick finer-grained timeouts than hours allow (15 or 30 minutes are realistic for security-conscious users). Users with stricter security needs shorten the value; users with longer working windows extend up to a cap (provisionally 10080 minutes = 7 days; cap committed when the user-settings UI lands).
 
 **JWT carries:**
 
@@ -110,11 +112,17 @@ A demotion (Owner → Viewer) takes effect on the next JWT issue (sign-in or wor
 
 If instant role revocation ever becomes a real requirement (terminated-employee scenario in a future B2B context), the move is a per-request DB role lookup with a short cache — but for MVP, JWT-embedded role is fine.
 
-### Multi-tab implication
+### Browser-binding: one role per browser at a time
 
-Same browser, same login = same workspace. Two tabs of the same authenticated session are both bound to the same `currentWorkspaceId`. To work in two workspaces simultaneously, the user opens a separate browser session (incognito, different profile, or signs out / signs in to switch context).
+A browser instance can hold **exactly one** workspace+role context at a time. The cookie/storage scope is the unit; the same browser cannot be logged into two roles concurrently.
 
-This is **intended**, not a workaround. Aligns with the "deliberate workspace switch" framing — cross-workspace work should feel like a context change, not a tab change.
+To work in two workspaces simultaneously, the user opens a **separate browser session** that has its own cookie store:
+
+- **A different browser application** (Chrome + Firefox, Firefox + Safari, etc.).
+- **A private / incognito tab** in the same browser. Private mode has separate cookie storage from the main profile, so it counts as a distinct session.
+- **A different browser profile** (Chrome's "Profile 2", Firefox's containers).
+
+Same-browser two-tab usage stays in the *same* role — this is intended, not a workaround. It aligns with the "deliberate workspace switch" framing: cross-workspace work should feel like a context change, not a tab change. Users with multiple memberships and a real need for parallel work can use any of the separate-session options above; they're a deliberate setup step, not accidental.
 
 ### Cross-workspace isolation testing
 
@@ -124,7 +132,7 @@ Per ADR 0001's "Non-functional" section, every entity test suite must include a 
 
 **Required cases per entity:**
 
-1. **Workspace isolation.** Authenticate as user-A bound to workspace W-A. Request a resource owned by W-B. Assert 403 / empty / 404 (depending on info-leakage policy — consistency to be settled when the first entity lands).
+1. **Workspace isolation.** Authenticate as user-A bound to workspace W-A. Request a resource owned by W-B. **Likely 404** for security / info-leakage reasons (don't reveal that the resource exists at all, since the requesting user has no business knowing). Final shape settles when the first entity's HTTP handler is written and we see what actually feels right; documented in this ADR's open questions until then.
 2. **JWT-override defense.** Authenticate as user-A bound to W-A. Send a request with `workspaceId=W-B` in the body / header / URL. Assert the request is scoped to W-A regardless of the override attempt.
 3. **Role enforcement (Viewer).** Authenticate as Viewer of W-A. Attempt a mutation. Assert 403.
 4. **Role enforcement (Owner).** Authenticate as Owner of W-A. Same mutation. Assert 200.
@@ -162,8 +170,8 @@ The shared fixture pattern from PR #19's `withFixture` infrastructure should be 
 ## Open questions
 
 - **Better-Auth column-name conventions.** Which Better-Auth columns we can rename to project conventions vs. which are pinned by Better-Auth's internal expectations. Surface as encountered during integration.
-- **Session TTL upper bound.** 4h default is set; the upper bound for user-configurable TTL is provisionally 168h (7d) but not yet committed. Resolve when the user-settings UI lands.
-- **Cross-workspace isolation HTTP response shape.** 403 vs 404 vs empty — the project hasn't picked a consistent info-leakage stance yet. Resolve when the first entity's HTTP handler is written; document in this ADR or a follow-up.
+- **Session TTL upper bound.** 240-minute default is set; the upper bound for user-configurable TTL is provisionally 10080 minutes (7 days) but not yet committed. Resolve when the user-settings UI lands.
+- **Cross-workspace isolation HTTP response shape.** Lean is **404** (security through info-non-leakage — don't reveal that a resource exists if the requester isn't entitled to know). Confirm vs. revisit when the first entity's HTTP handler is written; document the final call in this ADR or a follow-up.
 - **Lookup-table column names** for the workspace-scoped lookups (`positionType`, `workModel`, `applicationMethod`, `activityType`) where the bare-noun convention collides with the table name. Resolve case-by-case as each table arrives.
 - **Instant-revocation scenarios.** If / when PJS3 acquires a context where instant role revocation matters (B2B, employee termination, security incident), revisit the JWT-embedded-role vs DB-lookup tradeoff.
 
