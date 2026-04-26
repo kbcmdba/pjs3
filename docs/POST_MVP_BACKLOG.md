@@ -17,4 +17,4 @@ PJS2's `todo.php` was triaged at this point. Items already covered by PJS3 MVP s
 
 ## Future candidates
 
-(none yet — add as they emerge)
+- **`foundMethod` lookup table** — workspace-scoped lookup paralleling `applicationMethod`, distinguishing how a job was *discovered* from how it was *applied to*. Seeded values: Online, News, Paper, Referral, Word-of-Mouth, Agency, Other. Distinct from `applicationMethod` because the two answer different questions and inform different parts of an unemployment activity report (search-breadth vs. application-mode). Surfaced 2026-04-26 from PJS2 dogfooding while filling out activity reports; KB chose post-MVP over MVP-scope expansion.
