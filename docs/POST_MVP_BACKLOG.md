@@ -17,4 +17,15 @@ PJS2's `todo.php` was triaged at this point. Items already covered by PJS3 MVP s
 
 ## Future candidates
 
-(none yet — add as they emerge)
+### Notes that link to multiple entities — added 2026-04-29
+
+PJS2's note model is `(appliesToTable, appliesToId)` — one note belongs to exactly one job, contact, or company. Most real outreach events touch all three (a LinkedIn InMail to Anish Shah is *about* the Tandem job, *to* the contact, *at* the company). The current workaround is writing parallel notes — manually duplicating content across entities so each surface displays the activity. That fragments the audit trail and creates drift over time.
+
+PJS3 should let a note attach to N entities. Sketch:
+
+- **Schema:** drop `appliesToTable` / `appliesToId` from `note`; add a `noteLink` join table with `(note_id, entity_table, entity_id)`. A note can have 1..N rows in `noteLink`.
+- **UI:** when creating a note, pick a "primary" entity (where the note is composed from) plus optional secondary links (tags). Note detail shows the primary; entity detail pages show notes where they're either primary or linked.
+- **Migration:** PJS2 → PJS3 is straightforward: every existing note becomes a noteLink row with entity_table/entity_id from the legacy fields.
+- **Reporting impact:** weekly work-search reports can pull notes by *any* linked entity without missing cross-entity activity. (Current PJS2 friction: needing to read both job-side and contact-side notes to reconstruct one outreach event.)
+
+Surfaced 2026-04-29 when an Anish Shah Tandem InMail had to be logged twice — once on the contact and once on the job — to show up correctly in both views.
