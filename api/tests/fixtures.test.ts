@@ -6,15 +6,15 @@ import { withFixture } from './fixtures/_harness';
 import { applyWithCollaboratorRole } from './fixtures/withCollaboratorRole';
 
 interface FixtureLogRow {
-  id: number;
-  fixture_id: number;
+  fixtureLogId: number;
+  fixtureCatalogId: number;
   test_name: string | null;
   created_at: Date;
   load_time_ms: number | null;
 }
 
 interface FixtureCatalogRow {
-  id: number;
+  fixtureCatalogId: number;
   name: string;
 }
 
@@ -33,8 +33,8 @@ describe('withFixture', () => {
         expect(catalog).toHaveLength(1);
 
         const [logRows] = await conn.query(
-          'SELECT * FROM `_pjs3_test_fixture_log` WHERE fixture_id = ?',
-          [catalog[0]!.id],
+          'SELECT * FROM `_pjs3_test_fixture_log` WHERE fixtureCatalogId = ?',
+          [catalog[0]!.fixtureCatalogId],
         );
         const log = logRows as FixtureLogRow[];
         expect(log).toHaveLength(1);
@@ -65,8 +65,8 @@ describe('withFixture', () => {
         expect(catalog).toHaveLength(1);
 
         const [logRows] = await conn.query(
-          'SELECT * FROM `_pjs3_test_fixture_log` WHERE fixture_id = ?',
-          [catalog[0]!.id],
+          'SELECT * FROM `_pjs3_test_fixture_log` WHERE fixtureCatalogId = ?',
+          [catalog[0]!.fixtureCatalogId],
         );
         const log = logRows as FixtureLogRow[];
         expect(log).toHaveLength(1);

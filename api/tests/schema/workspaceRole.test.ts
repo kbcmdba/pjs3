@@ -6,19 +6,19 @@ describe('workspaceRole schema', () => {
   const config = getTableConfig(workspaceRoleTable);
   const byName = (name: string) => config.columns.find((c) => c.name === name);
 
-  it('declares exactly id, role, sortKey columns', () => {
+  it('declares exactly workspaceRoleId, role, sortKey columns', () => {
     expect(config.columns.map((c) => c.name).sort()).toEqual([
-      'id',
       'role',
       'sortKey',
+      'workspaceRoleId',
     ]);
   });
 
-  it('id is the primary key, unsigned int with autoincrement', () => {
-    const id = byName('id');
-    expect(id).toBeDefined();
-    expect(id?.primary).toBe(true);
-    expect(id?.getSQLType().toLowerCase()).toMatch(/^int unsigned$/);
+  it('workspaceRoleId is the primary key, unsigned int with autoincrement', () => {
+    const pk = byName('workspaceRoleId');
+    expect(pk).toBeDefined();
+    expect(pk?.primary).toBe(true);
+    expect(pk?.getSQLType().toLowerCase()).toMatch(/^int unsigned$/);
   });
 
   it('role is a non-null varchar(64) with a unique constraint', () => {

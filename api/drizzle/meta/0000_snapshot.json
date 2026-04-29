@@ -1,14 +1,14 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "217f51b3-40d3-479a-8b03-0f285a25920d",
+  "id": "56f136d2-e3d6-419e-91c2-57d7969cb128",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "workspaceRole": {
       "name": "workspaceRole",
       "columns": {
-        "id": {
-          "name": "id",
+        "workspaceRoleId": {
+          "name": "workspaceRoleId",
           "type": "int unsigned",
           "primaryKey": false,
           "notNull": true,
@@ -32,10 +32,10 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "workspaceRole_id": {
-          "name": "workspaceRole_id",
+        "workspaceRole_workspaceRoleId": {
+          "name": "workspaceRole_workspaceRoleId",
           "columns": [
-            "id"
+            "workspaceRoleId"
           ]
         }
       },
