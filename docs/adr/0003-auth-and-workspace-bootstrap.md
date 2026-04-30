@@ -1,22 +1,32 @@
 # ADR 0003: Auth and workspace-bootstrap design
 
 - **Status:** Accepted
-- **Date:** 2026-04-25
+- **Date:** 2026-04-25 (amended 2026-04-26 to replace Better-Auth with a roll-our-own implementation; design preserved)
 - **Decision-makers:** kbenton; Claude (collaborator on this project)
 
 ## Context
 
 PJS3 is a multi-tenant SaaS with workspace tenancy from day one (Owner + Viewer roles in MVP, post-MVP Collaborator). The next milestone after the test-infrastructure stack (PRs #9–#20) is the auth + workspace-bootstrap layer: signup, email verification, login, session management, workspace creation, role enforcement, and cross-workspace isolation.
 
-`MVP_SCOPE.md` commits to **Better-Auth** (with the organization plugin, surfaced as "Workspace") as the auth library. This ADR captures the design choices that resolve how Better-Auth is integrated, how sessions are shaped, how multi-membership is handled, and how isolation is enforced.
+This ADR captures the design choices for that layer: how sessions are shaped, how multi-membership is handled, how isolation is enforced. The implementation library is **our own auth code**, not a third-party framework — see "Note on the Better-Auth pivot" below for why.
 
 ## Decision
 
-### Schema ownership: Drizzle owns all DDL
+### Schema ownership: Drizzle, project conventions throughout
 
-Better-Auth's tables (`user`, `session`, `account`, `organization`, `member`, `invitation`, plus its plugin tables) live in `src/schema/` alongside our domain tables, managed by `drizzle-kit`. Better-Auth's built-in migration support is **not** used.
+All auth-related tables live in `src/schema/` alongside domain tables, managed by `drizzle-kit`. Project schema conventions apply uniformly: `<tableName>Id INT UNSIGNED` synthetic PKs, FK-to-catalog over repeated varchars, bare-noun lookup columns, no JSON columns, `TIMESTAMP DEFAULT CURRENT_TIMESTAMP` on append-only tables, etc. (see `project_data_modeling.md` memory for the full convention list.)
 
-**Why:** A single source of truth for DDL makes schema review, migrations, and forensic inspection simpler — a reader doesn't have to navigate to Better-Auth's repo to understand "what tables exist." Project schema conventions (synthetic UNSIGNED auto-increment PK, FK-to-catalog over repeated varchars, bare-noun lookup columns, no JSON columns) apply to Better-Auth's tables wherever Better-Auth's pluggable schema allows.
+The auth tables we expect to need:
+
+- **`user`** — auth subject. Email, hashed password, verification state, account-management columns.
+- **`session`** (or rely on JWT alone, see "Sessions" below) — if we keep server-side session records, this is where they live.
+- **`emailVerificationToken`** — one-shot tokens for verifying signup emails.
+- **`passwordResetToken`** — one-shot tokens for password resets.
+- **`workspace`** — the workspace tenancy container.
+- **`workspaceMember`** — junction: `(workspaceMemberId, workspaceId, userId, workspaceRoleId, createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`. UNIQUE KEY on `(workspaceId, userId)`.
+- **`workspaceRole`** — already exists from PR #13 (system-level lookup, seeded with Owner and Viewer).
+
+**Why:** A single source of DDL truth makes schema review, migrations, and forensic inspection simpler. No external library's table-shape assumptions to negotiate with; project conventions hold without exception.
 
 ### Auth methods (MVP and roadmap)
 
@@ -33,12 +43,12 @@ A user who has signed up but not yet verified their email **cannot perform any a
 The flow:
 
 1. Signup form: user enters email + password.
-2. Better-Auth creates the `user` row in an unverified state.
-3. Verification email sent (Mailpit in dev, real provider TBD).
-4. User clicks the verification link.
+2. Auth code hashes the password (argon2id) and creates the `user` row in an unverified state. An `emailVerificationToken` row is also created with a cryptographically random token (≥256 bits).
+3. Verification email sent (Mailpit in dev, real provider TBD) containing the token in the link.
+4. User clicks the verification link. Endpoint validates the token (single-use, time-limited, indistinguishable failure modes), marks the `user` as verified, deletes the consumed token.
 5. User is redirected to sign in.
 6. On successful first sign-in:
-   - Atomic transaction creates the user's personal `Workspace` row + `WorkspaceMember` row with role=Owner.
+   - Atomic transaction creates the user's personal `workspace` row + `workspaceMember` row with `workspaceRoleId` = Owner.
    - JWT issued (see "Login" below).
 7. Subsequent sign-ins skip the workspace-creation step (already exists).
 
@@ -54,17 +64,19 @@ JWT is the session bearer. PJS3 is API-first — long-term, the same backend ser
 
 - `userId` — the authenticated user
 - `currentWorkspaceId` — the workspace bound to this session
-- `currentRoleId` — the user's role in `currentWorkspaceId`
+- `currentRoleId` — the user's role in `currentWorkspaceId` (FK to `workspaceRole`)
+- `iat` — issued at
 - `exp` — expiry
-- standard Better-Auth claims
+
+The JWT is signed with a server-held key (rotated periodically). It's stored in an `HttpOnly` + `SameSite=Lax` + `Secure` cookie for the web UI; external API consumers can also send it in the `Authorization: Bearer …` header. Same JWT, two delivery mechanisms — no parallel session model.
 
 ### Login: workspace selection on multi-membership
 
 Users typically belong to multiple workspaces (their personal one, plus any they've been invited to as Viewer). Login is therefore a two-step process:
 
-1. **Authenticate.** User enters credentials; Better-Auth verifies.
+1. **Authenticate.** User enters credentials; auth code verifies the password against the argon2id-hashed value on `user`. Account-enumeration defenses apply: timing-safe comparison, identical response shape and timing for "wrong password" vs "no such user." Rate limiting on the endpoint (per-IP, per-email).
 2. **Select workspace context (if multi-membership).**
-   - Query `WorkspaceMember WHERE userId = ?` for all `(workspaceId, roleId)` pairs.
+   - Query `workspaceMember WHERE userId = ?` for all `(workspaceId, workspaceRoleId)` pairs.
    - **If exactly 1 membership:** directly issue the JWT bound to that workspace+role.
    - **If multiple memberships:** present a selection UI:
      ```
@@ -81,12 +93,12 @@ Switching workspaces is a **deliberate action**, not URL navigation. The UI expo
 
 1. User clicks "switch workspace."
 2. Credentials prompted again (same form as login).
-3. Better-Auth re-verifies.
+3. Auth code re-verifies the password (same timing-safe + rate-limited path as login).
 4. *(Post-MVP: 2FA re-triggers here as well.)*
 5. Workspace selection menu shown.
 6. User picks a workspace.
 7. New JWT issued bound to the new workspace+role.
-8. Old JWT invalidated.
+8. Old JWT invalidated (added to a short-lived blacklist that survives until the old JWT's natural `exp`).
 
 The old JWT remains valid until the new one is issued, so a user who cancels the switch flow isn't accidentally logged out.
 
@@ -155,11 +167,12 @@ The shared fixture pattern from PR #19's `withFixture` infrastructure should be 
 
 - **Re-auth friction on workspace switch.** Users with multiple workspaces re-enter credentials each time they switch. Bounded by the fact that switches are rare events for most users (one personal workspace, occasional invited-to workspaces).
 - **Multi-tab same-session restriction.** Users who want to work in two workspaces simultaneously must use separate browser sessions. Less convenient than tab-per-workspace, but intentional.
-- **Better-Auth's pluggable schema means we accept its column shapes where it doesn't yield.** Some column names may not match project conventions if Better-Auth requires them. Documented case-by-case as encountered.
+- **Roll-our-own auth means we own the security details.** Account-enumeration defense, session fixation, password reset token entropy, rate limiting, argon2id parameter tuning, JWT signing key rotation, etc. — all our responsibility. Mitigated by `/security-review` (per global CLAUDE.md) before declaring auth "done," and by the security-test pass per ADR 0002's pre-release tier. Roadmap items (OAuth, 2FA) are also our build, not a library upgrade.
 - **JWT-embedded role means staleness up to TTL.** A demoted user can act with their old role until JWT renewal. Mitigated by 4h default TTL; instant-revocation deferred to a future ADR if needed.
 
 ## Alternatives considered
 
+- **Better-Auth library** (with the organization plugin and JWT plugin). The original 2026-04-25 design assumed Better-Auth would deliver clean Drizzle integration with project conventions. RTFM-on-the-docs (2026-04-26) revealed three structural mismatches: string/UUID PKs vs `INT UNSIGNED`; `member.role` as a string column conflicting with our `workspaceRole` lookup; the JWT plugin explicitly *not* a session replacement (Better-Auth's primary session model is cookies, contradicting this ADR's JWT-is-session premise). Pivoted to roll-our-own — see "Note on the Better-Auth pivot."
 - **Workspace context in URL** (`/api/workspaces/{workspaceId}/...`, à la Slack / Notion / GitHub orgs). Cleaner REST shape; no token reissue on switch. Rejected because PJS3's user pattern (most time spent in one workspace) makes per-request workspace context overkill, and the explicit-selection model gives stronger forensic and accidental-action guarantees.
 - **Workspace context in a cookie or custom header instead of JWT.** Same end result; rejected because JWT carries it natively without a parallel mechanism, and PJS3 will need JWT for the API anyway.
 - **Magic links.** Rejected — security argument above.
@@ -169,11 +182,23 @@ The shared fixture pattern from PR #19's `withFixture` infrastructure should be 
 
 ## Open questions
 
-- **Better-Auth column-name conventions.** Which Better-Auth columns we can rename to project conventions vs. which are pinned by Better-Auth's internal expectations. Surface as encountered during integration.
 - **Session TTL upper bound.** 240-minute default is set; the upper bound for user-configurable TTL is provisionally 10080 minutes (7 days) but not yet committed. Resolve when the user-settings UI lands.
 - **Cross-workspace isolation HTTP response shape.** Lean is **404** (security through info-non-leakage — don't reveal that a resource exists if the requester isn't entitled to know). Confirm vs. revisit when the first entity's HTTP handler is written; document the final call in this ADR or a follow-up.
 - **Lookup-table column names** for the workspace-scoped lookups (`positionType`, `workModel`, `applicationMethod`, `activityType`) where the bare-noun convention collides with the table name. Resolve case-by-case as each table arrives.
 - **Instant-revocation scenarios.** If / when PJS3 acquires a context where instant role revocation matters (B2B, employee termination, security incident), revisit the JWT-embedded-role vs DB-lookup tradeoff.
+- **JWT signing key management.** Generation, storage (env var, Vault, file), rotation cadence, and how rotation invalidates in-flight JWTs (or doesn't) — all unsettled. Resolve when the auth implementation PRs land; the schema PR doesn't depend on this.
+
+## Note on the Better-Auth pivot
+
+This ADR was originally written 2026-04-25 around **Better-Auth** (the organization plugin surfaced as "Workspace," plus the JWT plugin). PR #27 installed the dependency. Reading Better-Auth's docs in detail the next day (2026-04-26) surfaced three structural mismatches:
+
+1. **String/UUID PKs by default.** PJS3's project convention is `INT UNSIGNED` auto-increment. Better-Auth's opt-in `serial` mode keeps TS types as `string` and converts on read/write — workable but a real wrinkle that infects every typed call.
+2. **`member.role` as a string column** ("owner", "admin", "member"). PJS3 has a `workspaceRole` lookup table from PR #13 with FK semantics. The two models conflict.
+3. **JWT plugin is explicitly not a session replacement.** Better-Auth's docs: "This is not meant as a replacement for the session." Better-Auth's primary session model is cookie-based with server-side state. ADR 0003's "JWT is the session bearer" premise contradicts this.
+
+User decision: roll our own auth library. Schema purity and project-convention coherence won over framework convenience. The *design* in this ADR (email-verification gate, workspace selection at login, full re-auth on workspace switch, idle TTL with activity-resets-timer, browser-binding, JWT-bound workspace context) carries over intact; only the implementation library changes. See PR #28 (auth-pivot doc) and PR #30 (Better-Auth dep removed).
+
+The lesson worth carrying forward: **validate framework fit before designing around it.** An ADR that names a library should include a fit-check pass — read the library's actual schema, default behaviors, and stated non-features — *before* building a design on assumed behavior. Caught here at acceptable cost (no schema files written yet); discovery cost would have been much higher after.
 
 ## References
 
