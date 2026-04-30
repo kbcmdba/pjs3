@@ -1,7 +1,7 @@
 # ADR 0003: Auth and workspace-bootstrap design
 
 - **Status:** Accepted
-- **Date:** 2026-04-25 (amended 2026-04-26 to replace Better-Auth with a roll-our-own implementation; design preserved)
+- **Date:** 2026-04-25 (amended 2026-04-30 to replace Better-Auth with a roll-our-own implementation per the 2026-04-26 pivot decision; design preserved)
 - **Decision-makers:** kbenton; Claude (collaborator on this project)
 
 ## Context
