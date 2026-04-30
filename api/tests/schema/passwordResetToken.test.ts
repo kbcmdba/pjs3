@@ -29,10 +29,10 @@ describe('passwordResetToken schema', () => {
     expect(userId?.getSQLType().toLowerCase()).toMatch(/^int unsigned$/);
   });
 
-  it('token is a non-null unique varchar(64) - cryptographically random bytes (>=256 bits)', () => {
+  it('token is a non-null unique char(64) - hex-encoded 32 bytes of cryptographic random', () => {
     const token = byName('token');
     expect(token?.notNull).toBe(true);
-    expect(token?.getSQLType().toLowerCase()).toBe('varchar(64)');
+    expect(token?.getSQLType().toLowerCase()).toBe('char(64)');
     expect(token?.isUnique).toBe(true);
   });
 

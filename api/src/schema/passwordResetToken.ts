@@ -1,4 +1,4 @@
-import { int, mysqlTable, timestamp, varchar } from 'drizzle-orm/mysql-core';
+import { char, int, mysqlTable, timestamp } from 'drizzle-orm/mysql-core';
 import { userTable } from './user';
 
 export const passwordResetTokenTable = mysqlTable('passwordResetToken', {
@@ -10,7 +10,9 @@ export const passwordResetTokenTable = mysqlTable('passwordResetToken', {
   userId: int('userId', { unsigned: true })
     .notNull()
     .references(() => userTable.userId, { onDelete: 'restrict', onUpdate: 'restrict' }),
-  token: varchar('token', { length: 64 }).notNull().unique(),
+  // Hex-encoded 32 bytes of cryptographic random = 64 chars exactly.
+  // CHAR(64) over VARCHAR(64) for the same reason as emailVerificationToken.
+  token: char('token', { length: 64 }).notNull().unique(),
   expiresAt: timestamp('expiresAt').notNull(),
   createdAt: timestamp('createdAt').notNull().defaultNow(),
 });

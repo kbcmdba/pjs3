@@ -63,6 +63,37 @@ post-generation hand-editing:
 If `drizzle-kit generate` regenerates the file from a schema change, the
 hand-edits get clobbered. Re-apply them before committing.
 
+## Known wart: `-->` is not valid SQL
+
+drizzle-kit emits `--> statement-breakpoint` markers between statements.
+**`-->` is not a valid SQL line comment** -- valid line comments require
+`-- ` followed by a space. The `-->` lines exist as metadata that
+drizzle's migrator (`drizzle-orm/migrator.js`) splits the file on:
+
+```js
+const result = query.split("--> statement-breakpoint").map(...)
+```
+
+The drizzle migrator strips them out before sending statements to MySQL,
+so the `-->` lines never actually reach the database. The migration runs
+correctly when invoked through drizzle.
+
+**But:** if a human runs the file directly through `mysql` or another raw
+SQL tool (without drizzle's preprocessing), the `-->` lines fail with a
+syntax error. Use `npm --prefix api run db:migrate` (drizzle-driven), not
+`mysql < drizzle/0000_initial.sql`.
+
+If you genuinely need a raw-SQL-runnable file, post-process the migration
+to strip `--> statement-breakpoint` lines before piping to mysql:
+
+```sh
+grep -v '^--> statement-breakpoint$' drizzle/0000_initial.sql | mysql ...
+```
+
+Worth filing an upstream drizzle issue requesting valid line-comment
+syntax (`-- > statement-breakpoint` would work and is one space away
+from the current marker). Tracked locally; not blocking.
+
 ## `meta/` -- drizzle-kit internal bookkeeping
 
 The two files under `meta/` are drizzle-kit's working state for computing

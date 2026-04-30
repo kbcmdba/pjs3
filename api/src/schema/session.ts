@@ -1,4 +1,4 @@
-import { int, mysqlTable, timestamp, varchar } from 'drizzle-orm/mysql-core';
+import { char, int, mysqlTable, timestamp } from 'drizzle-orm/mysql-core';
 import { userTable } from './user';
 import { workspaceTable } from './workspace';
 import { workspaceRoleTable } from './workspaceRole';
@@ -27,9 +27,10 @@ export const sessionTable = mysqlTable('session', {
   // jti = "JWT ID" (RFC 7519 standard claim). A unique opaque identifier
   // embedded in the JWT's claims. Server uses it to look up the row; without
   // it, the JWT alone could not be invalidated (logout, workspace switch).
-  // varchar(36) sized to fit a UUID-shape, which is what most JWT libraries
-  // emit by default.
-  jti: varchar('jti', { length: 36 }).notNull().unique(),
+  // CHAR(36) sized for UUID-shape (8-4-4-4-12 hex), which is what most JWT
+  // libraries emit by default. Fixed-width = CHAR over VARCHAR to skip the
+  // length prefix.
+  jti: char('jti', { length: 36 }).notNull().unique(),
 
   currentWorkspaceId: int('currentWorkspaceId', { unsigned: true })
     .notNull()

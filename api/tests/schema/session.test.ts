@@ -37,12 +37,13 @@ describe('session schema', () => {
   // `jti` is RFC 7519's "JWT ID" claim - a unique opaque identifier embedded
   // in the JWT's signed claims. The server uses it to look up the session
   // row; the JWT alone cannot be invalidated (logout, workspace switch)
-  // without a server-side handle keyed on this value. varchar(36) sized for
-  // UUID-shaped JTIs, which is the default emitted by most JWT libraries.
-  it('jti (JWT ID, RFC 7519) is a non-null unique varchar(36); the server uses it to look up the session row', () => {
+  // without a server-side handle keyed on this value. CHAR(36) sized for
+  // UUID-shape (8-4-4-4-12 hex), which is the default emitted by most JWT
+  // libraries. CHAR over VARCHAR because UUIDs are exactly 36 chars.
+  it('jti (JWT ID, RFC 7519) is a non-null unique char(36); the server uses it to look up the session row', () => {
     const jti = byName('jti');
     expect(jti?.notNull).toBe(true);
-    expect(jti?.getSQLType().toLowerCase()).toBe('varchar(36)');
+    expect(jti?.getSQLType().toLowerCase()).toBe('char(36)');
     expect(jti?.isUnique).toBe(true);
   });
 

@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "41ffc1fa-9edf-4ada-96f8-468926297d30",
+  "id": "cdf02cb7-353a-401a-b2cc-903cce72ce0b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "emailVerificationToken": {
@@ -23,7 +23,7 @@
         },
         "token": {
           "name": "token",
-          "type": "varchar(64)",
+          "type": "char(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -97,7 +97,7 @@
         },
         "token": {
           "name": "token",
-          "type": "varchar(64)",
+          "type": "char(64)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -171,7 +171,7 @@
         },
         "jti": {
           "name": "jti",
-          "type": "varchar(36)",
+          "type": "char(36)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false

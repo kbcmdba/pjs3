@@ -1,7 +1,7 @@
 CREATE TABLE `emailVerificationToken` (
 	`emailVerificationTokenId` int unsigned AUTO_INCREMENT NOT NULL,
 	`userId` int unsigned NOT NULL,
-	`token` varchar(64) NOT NULL,
+	`token` char(64) NOT NULL,
 	`expiresAt` timestamp NOT NULL,
 	`createdAt` timestamp NOT NULL DEFAULT (now()),
 	CONSTRAINT `emailVerificationToken_emailVerificationTokenId` PRIMARY KEY(`emailVerificationTokenId`),
@@ -11,25 +11,32 @@ CREATE TABLE `emailVerificationToken` (
 CREATE TABLE `passwordResetToken` (
 	`passwordResetTokenId` int unsigned AUTO_INCREMENT NOT NULL,
 	`userId` int unsigned NOT NULL,
-	`token` varchar(64) NOT NULL,
+	`token` char(64) NOT NULL,
 	`expiresAt` timestamp NOT NULL,
 	`createdAt` timestamp NOT NULL DEFAULT (now()),
 	CONSTRAINT `passwordResetToken_passwordResetTokenId` PRIMARY KEY(`passwordResetTokenId`),
 	CONSTRAINT `passwordResetToken_token_unique` UNIQUE(`token`)
 );
 --> statement-breakpoint
+-- session: server-side row per issued JWT. The JWT carries `jti` (RFC 7519
+-- "JWT ID" claim, UUID-shaped) in its signed claims; the server uses jti to
+-- look up this row, which holds the workspace/role binding plus the
+-- lastActiveAt timestamp that drives idle-TTL re-issuance on activity.
+-- Without server-side state, we couldn't do "activity resets the timer";
+-- pure-stateless JWT has nowhere to record activity.
 CREATE TABLE `session` (
 	`sessionId` int unsigned AUTO_INCREMENT NOT NULL,
 	`userId` int unsigned NOT NULL,
-	`jti` varchar(36) NOT NULL,
+	`jti` char(36) NOT NULL,                   -- JWT ID (RFC 7519); UUID-shape
 	`currentWorkspaceId` int unsigned NOT NULL,
 	`currentRoleId` int unsigned NOT NULL,
-	`expiresAt` timestamp NOT NULL,
-	`lastActiveAt` timestamp NOT NULL DEFAULT (now()),
+	`expiresAt` timestamp NOT NULL,             -- absolute (signing-key rotation horizon)
+	`lastActiveAt` timestamp NOT NULL DEFAULT (now()),  -- updated per request; drives idle TTL
 	`createdAt` timestamp NOT NULL DEFAULT (now()),
 	CONSTRAINT `session_sessionId` PRIMARY KEY(`sessionId`),
 	CONSTRAINT `session_jti_unique` UNIQUE(`jti`)
-);
+)
+;
 --> statement-breakpoint
 CREATE TABLE `user` (
 	`userId` int unsigned AUTO_INCREMENT NOT NULL,
@@ -69,25 +76,29 @@ CREATE TABLE `workspaceRole` (
 	CONSTRAINT `workspaceRole_role_unique` UNIQUE(`role`)
 );
 --> statement-breakpoint
--- FOREIGN KEY constraints. Combined per table to avoid drizzle-kit's default
--- of one ALTER TABLE per FK (which forces InnoDB to do per-statement
--- table-rewrite work and reads less clearly to a human).
--- ON DELETE / ON UPDATE = RESTRICT throughout: forces explicit teardown of
--- dependent rows rather than silent cascade or orphaning. (RESTRICT chosen
--- over the synonym NO ACTION for readability -- "no action" reads like
--- "nothing happens" but in InnoDB it's the same behavior as RESTRICT.)
+-- FOREIGN KEY constraints. Combined per table (one ALTER TABLE statement
+-- per table even when multiple FKs are added) so InnoDB does the
+-- table-rewrite work once instead of once per FK. ON DELETE / ON UPDATE
+-- = RESTRICT throughout: forces explicit teardown of dependent rows
+-- rather than silent cascade or orphaning. (RESTRICT chosen over the
+-- synonym NO ACTION for readability: "no action" reads like "nothing
+-- happens" but in InnoDB it does take action -- it rejects the operation.)
 ALTER TABLE `emailVerificationToken`
-	ADD CONSTRAINT `emailVerificationToken_userId_user_userId_fk` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE restrict ON UPDATE restrict;
+	ADD CONSTRAINT `emailVerificationToken_userId_user_userId_fk` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE restrict ON UPDATE restrict
+;
 --> statement-breakpoint
 ALTER TABLE `passwordResetToken`
-	ADD CONSTRAINT `passwordResetToken_userId_user_userId_fk` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE restrict ON UPDATE restrict;
+	ADD CONSTRAINT `passwordResetToken_userId_user_userId_fk` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE restrict ON UPDATE restrict
+;
 --> statement-breakpoint
 ALTER TABLE `session`
 	ADD CONSTRAINT `session_userId_user_userId_fk` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE restrict ON UPDATE restrict,
 	ADD CONSTRAINT `session_currentWorkspaceId_workspace_workspaceId_fk` FOREIGN KEY (`currentWorkspaceId`) REFERENCES `workspace`(`workspaceId`) ON DELETE restrict ON UPDATE restrict,
-	ADD CONSTRAINT `session_currentRoleId_workspaceRole_workspaceRoleId_fk` FOREIGN KEY (`currentRoleId`) REFERENCES `workspaceRole`(`workspaceRoleId`) ON DELETE restrict ON UPDATE restrict;
+	ADD CONSTRAINT `session_currentRoleId_workspaceRole_workspaceRoleId_fk` FOREIGN KEY (`currentRoleId`) REFERENCES `workspaceRole`(`workspaceRoleId`) ON DELETE restrict ON UPDATE restrict
+;
 --> statement-breakpoint
 ALTER TABLE `workspaceMember`
 	ADD CONSTRAINT `workspaceMember_workspaceId_workspace_workspaceId_fk` FOREIGN KEY (`workspaceId`) REFERENCES `workspace`(`workspaceId`) ON DELETE restrict ON UPDATE restrict,
 	ADD CONSTRAINT `workspaceMember_userId_user_userId_fk` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE restrict ON UPDATE restrict,
-	ADD CONSTRAINT `workspaceMember_workspaceRoleId_workspaceRole_workspaceRoleId_fk` FOREIGN KEY (`workspaceRoleId`) REFERENCES `workspaceRole`(`workspaceRoleId`) ON DELETE restrict ON UPDATE restrict;
+	ADD CONSTRAINT `workspaceMember_workspaceRoleId_workspaceRole_workspaceRoleId_fk` FOREIGN KEY (`workspaceRoleId`) REFERENCES `workspaceRole`(`workspaceRoleId`) ON DELETE restrict ON UPDATE restrict
+;
