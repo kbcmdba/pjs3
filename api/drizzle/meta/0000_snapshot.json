@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "0ee9e8f7-1c3a-48ae-97fe-191bc714881b",
+  "id": "41ffc1fa-9edf-4ada-96f8-468926297d30",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "emailVerificationToken": {
@@ -56,8 +56,8 @@
           "columnsTo": [
             "userId"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
         }
       },
       "compositePrimaryKeys": {
@@ -130,8 +130,8 @@
           "columnsTo": [
             "userId"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
         }
       },
       "compositePrimaryKeys": {
@@ -226,8 +226,8 @@
           "columnsTo": [
             "userId"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
         },
         "session_currentWorkspaceId_workspace_workspaceId_fk": {
           "name": "session_currentWorkspaceId_workspace_workspaceId_fk",
@@ -239,8 +239,8 @@
           "columnsTo": [
             "workspaceId"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
         },
         "session_currentRoleId_workspaceRole_workspaceRoleId_fk": {
           "name": "session_currentRoleId_workspaceRole_workspaceRoleId_fk",
@@ -252,8 +252,8 @@
           "columnsTo": [
             "workspaceRoleId"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
         }
       },
       "compositePrimaryKeys": {
@@ -451,8 +451,8 @@
           "columnsTo": [
             "workspaceId"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
         },
         "workspaceMember_userId_user_userId_fk": {
           "name": "workspaceMember_userId_user_userId_fk",
@@ -464,8 +464,8 @@
           "columnsTo": [
             "userId"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
         },
         "workspaceMember_workspaceRoleId_workspaceRole_workspaceRoleId_fk": {
           "name": "workspaceMember_workspaceRoleId_workspaceRole_workspaceRoleId_fk",
@@ -477,8 +477,8 @@
           "columnsTo": [
             "workspaceRoleId"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
         }
       },
       "compositePrimaryKeys": {

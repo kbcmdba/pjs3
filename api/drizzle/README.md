@@ -1,13 +1,67 @@
 # `drizzle/` -- generated migration artifacts
 
 This directory is **machine-generated** by `drizzle-kit` (see `npm run db:generate`).
-Don't hand-edit; rerun the generator against `src/schema/*` instead.
+Mostly-don't-hand-edit; rerun the generator against `src/schema/*` instead. Some
+post-generation hand-edits *are* expected and supported -- see "When hand-edits
+are appropriate" below.
+
+## What the schema represents
+
+This directory captures the production database state PJS3 expects. As of the
+current `0000_initial.sql`, the seven tables are:
+
+- **`user`** -- auth subjects. Email + argon2id password hash + verification
+  state + per-user session-idle-TTL preference + timestamps.
+- **`workspace`** -- the multi-tenancy container. Each user's personal
+  workspace, plus any they create or are invited to.
+- **`workspaceMember`** -- the junction making (workspace × user × role)
+  the unit of access. Append-only; role changes are DELETE+INSERT.
+- **`workspaceRole`** -- system-level lookup of role names (Owner, Viewer in
+  MVP; Collaborator post-MVP). Seeded by `seedReferenceData`.
+- **`emailVerificationToken`** -- single-use tokens for verifying signup
+  email. 24h TTL. Append-only; deleted on consume.
+- **`passwordResetToken`** -- single-use tokens for password reset. 1h TTL.
+  Append-only; deleted on consume.
+- **`session`** -- server-side session record per issued JWT. The JWT acts as
+  a cryptographically-signed handle; this row carries `currentWorkspaceId`,
+  `currentRoleId`, `expiresAt`, and `lastActiveAt` (which drives the
+  idle-TTL behavior). `jti` (JWT ID, RFC 7519) is the lookup key embedded
+  in the JWT's claims.
+
+See [ADR 0003](../../docs/adr/0003-auth-and-workspace-bootstrap.md) for the
+auth + workspace-bootstrap design that this schema implements.
 
 ## Source of truth: the `.sql` files
 
 `0000_initial.sql`, `0001_*.sql`, etc. are the migration files actually applied
 to MySQL. These are the canonical schema state. If you want to know what the
 database looks like, read these files.
+
+## When hand-edits are appropriate
+
+drizzle-kit's generated SQL is mostly fine as-is, but a few cases warrant
+post-generation hand-editing:
+
+- **Combining ALTER TABLE statements per table.** drizzle-kit emits one
+  `ALTER TABLE ... ADD CONSTRAINT ...` per FK, even when multiple FKs target
+  the same table. Combining them into a single `ALTER TABLE ... ADD ...,
+  ADD ..., ADD ...` is more readable AND lets InnoDB do the table-rewrite
+  work once per table instead of once per constraint. Hand-edited in
+  `0000_initial.sql`.
+- **Adding `RESTRICT` explicitly.** drizzle-kit's default for `.references()`
+  with no options is `ON DELETE no action ON UPDATE no action`. Specify
+  `{ onDelete: 'restrict', onUpdate: 'restrict' }` in the schema source so
+  the generator emits the more readable `RESTRICT` (functionally equivalent
+  in InnoDB but reads correctly: "no action" is misleading -- InnoDB does
+  take action; it rejects the DELETE/UPDATE).
+- **SQL comments documenting why an FK exists or why a constraint is set
+  the way it is.** Drizzle's TypeScript-level `// FK ON DELETE RESTRICT: ...`
+  comments live in `src/schema/*.ts` and don't make it to the SQL; if a
+  reviewer of the migration file would benefit from the rationale, hand-add
+  a `-- comment` in the migration after generating.
+
+If `drizzle-kit generate` regenerates the file from a schema change, the
+hand-edits get clobbered. Re-apply them before committing.
 
 ## `meta/` -- drizzle-kit internal bookkeeping
 

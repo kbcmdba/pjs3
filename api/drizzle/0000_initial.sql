@@ -69,11 +69,25 @@ CREATE TABLE `workspaceRole` (
 	CONSTRAINT `workspaceRole_role_unique` UNIQUE(`role`)
 );
 --> statement-breakpoint
-ALTER TABLE `emailVerificationToken` ADD CONSTRAINT `emailVerificationToken_userId_user_userId_fk` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `passwordResetToken` ADD CONSTRAINT `passwordResetToken_userId_user_userId_fk` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `session` ADD CONSTRAINT `session_userId_user_userId_fk` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `session` ADD CONSTRAINT `session_currentWorkspaceId_workspace_workspaceId_fk` FOREIGN KEY (`currentWorkspaceId`) REFERENCES `workspace`(`workspaceId`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `session` ADD CONSTRAINT `session_currentRoleId_workspaceRole_workspaceRoleId_fk` FOREIGN KEY (`currentRoleId`) REFERENCES `workspaceRole`(`workspaceRoleId`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `workspaceMember` ADD CONSTRAINT `workspaceMember_workspaceId_workspace_workspaceId_fk` FOREIGN KEY (`workspaceId`) REFERENCES `workspace`(`workspaceId`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `workspaceMember` ADD CONSTRAINT `workspaceMember_userId_user_userId_fk` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `workspaceMember` ADD CONSTRAINT `workspaceMember_workspaceRoleId_workspaceRole_workspaceRoleId_fk` FOREIGN KEY (`workspaceRoleId`) REFERENCES `workspaceRole`(`workspaceRoleId`) ON DELETE no action ON UPDATE no action;
+-- FOREIGN KEY constraints. Combined per table to avoid drizzle-kit's default
+-- of one ALTER TABLE per FK (which forces InnoDB to do per-statement
+-- table-rewrite work and reads less clearly to a human).
+-- ON DELETE / ON UPDATE = RESTRICT throughout: forces explicit teardown of
+-- dependent rows rather than silent cascade or orphaning. (RESTRICT chosen
+-- over the synonym NO ACTION for readability -- "no action" reads like
+-- "nothing happens" but in InnoDB it's the same behavior as RESTRICT.)
+ALTER TABLE `emailVerificationToken`
+	ADD CONSTRAINT `emailVerificationToken_userId_user_userId_fk` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE restrict ON UPDATE restrict;
+--> statement-breakpoint
+ALTER TABLE `passwordResetToken`
+	ADD CONSTRAINT `passwordResetToken_userId_user_userId_fk` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE restrict ON UPDATE restrict;
+--> statement-breakpoint
+ALTER TABLE `session`
+	ADD CONSTRAINT `session_userId_user_userId_fk` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE restrict ON UPDATE restrict,
+	ADD CONSTRAINT `session_currentWorkspaceId_workspace_workspaceId_fk` FOREIGN KEY (`currentWorkspaceId`) REFERENCES `workspace`(`workspaceId`) ON DELETE restrict ON UPDATE restrict,
+	ADD CONSTRAINT `session_currentRoleId_workspaceRole_workspaceRoleId_fk` FOREIGN KEY (`currentRoleId`) REFERENCES `workspaceRole`(`workspaceRoleId`) ON DELETE restrict ON UPDATE restrict;
+--> statement-breakpoint
+ALTER TABLE `workspaceMember`
+	ADD CONSTRAINT `workspaceMember_workspaceId_workspace_workspaceId_fk` FOREIGN KEY (`workspaceId`) REFERENCES `workspace`(`workspaceId`) ON DELETE restrict ON UPDATE restrict,
+	ADD CONSTRAINT `workspaceMember_userId_user_userId_fk` FOREIGN KEY (`userId`) REFERENCES `user`(`userId`) ON DELETE restrict ON UPDATE restrict,
+	ADD CONSTRAINT `workspaceMember_workspaceRoleId_workspaceRole_workspaceRoleId_fk` FOREIGN KEY (`workspaceRoleId`) REFERENCES `workspaceRole`(`workspaceRoleId`) ON DELETE restrict ON UPDATE restrict;

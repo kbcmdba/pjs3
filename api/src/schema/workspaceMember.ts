@@ -9,15 +9,18 @@ export const workspaceMemberTable = mysqlTable(
     workspaceMemberId: int('workspaceMemberId', { unsigned: true })
       .primaryKey()
       .autoincrement(),
+    // FK ON DELETE RESTRICT: a workspace cannot be deleted while members reference it;
+    // membership rows must be removed first. This forces explicit teardown rather than
+    // silent orphaning. Same rule for user and workspaceRole.
     workspaceId: int('workspaceId', { unsigned: true })
       .notNull()
-      .references(() => workspaceTable.workspaceId),
+      .references(() => workspaceTable.workspaceId, { onDelete: 'restrict', onUpdate: 'restrict' }),
     userId: int('userId', { unsigned: true })
       .notNull()
-      .references(() => userTable.userId),
+      .references(() => userTable.userId, { onDelete: 'restrict', onUpdate: 'restrict' }),
     workspaceRoleId: int('workspaceRoleId', { unsigned: true })
       .notNull()
-      .references(() => workspaceRoleTable.workspaceRoleId),
+      .references(() => workspaceRoleTable.workspaceRoleId, { onDelete: 'restrict', onUpdate: 'restrict' }),
     createdAt: timestamp('createdAt').notNull().defaultNow(),
   },
   (table) => [
