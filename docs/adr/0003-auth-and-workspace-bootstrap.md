@@ -56,7 +56,9 @@ The flow:
 
 ### Sessions: JWT, configurable TTL, 4h default
 
-JWT is the session bearer. PJS3 is API-first — long-term, the same backend serves the web UI and external API consumers, and JWT is the natural fit for both audiences without two parallel session models.
+**JWT** ([JSON Web Token, RFC 7519](https://datatracker.ietf.org/doc/html/rfc7519)) is a compact, signed token format that carries claims (key-value pairs) in its payload. The signature lets the server verify a token came from itself without storing per-session state. Standard claim names (`iat`, `exp`, `sub`, etc.) are short by RFC convention because the token is transmitted on every authenticated request — bytes matter.
+
+JWT is PJS3's session bearer. The project is API-first — long-term, the same backend serves the web UI and external API consumers, and JWT is the natural fit for both audiences without two parallel session models. The choice to use the RFC's standard claim names is **interoperability-driven, not deference**: standard JWT libraries (jsonwebtoken, jose, fast-jwt) auto-validate `exp`, debug tools (jwt.io, browser devtools) recognize the names, external API consumers know the shape. We retain the right to deviate from the spec if it ever produces a dumb outcome — and to document the deviation and report it upstream — but for these specific claim names the standard is good enough that compatibility wins.
 
 **TTL:** default 4 hours **of idle time** — activity (any authenticated request) resets the timer. So a user actively working stays signed in indefinitely; a user who walks away gets logged out 4 hours after their last action. **User-configurable** via a setting on `user` (e.g., `sessionIdleTtlMinutes INT UNSIGNED DEFAULT 240`). The unit is **minutes** so users can pick finer-grained timeouts than hours allow (15 or 30 minutes are realistic for security-conscious users). Users with stricter security needs shorten the value; users with longer working windows extend up to a cap (provisionally 10080 minutes = 7 days; cap committed when the user-settings UI lands).
 
@@ -65,8 +67,8 @@ JWT is the session bearer. PJS3 is API-first — long-term, the same backend ser
 - `userId` — the authenticated user
 - `currentWorkspaceId` — the workspace bound to this session
 - `currentRoleId` — the user's role in `currentWorkspaceId` (FK to `workspaceRole`)
-- `iat` — issued at
-- `exp` — expiry
+- `iat` (issued-at, RFC 7519 standard claim) — Unix timestamp when the JWT was issued. Used by signing-key rotation and replay-window checks.
+- `exp` (expires-at, RFC 7519 standard claim) — Unix timestamp after which the JWT must be rejected. Server enforces. With idle-TTL re-issuance on activity, `exp` moves forward as the user keeps working.
 
 The JWT is signed with a server-held key (rotated periodically). It's stored in an `HttpOnly` + `SameSite=Lax` + `Secure` cookie for the web UI; external API consumers can also send it in the `Authorization: Bearer …` header. Same JWT, two delivery mechanisms — no parallel session model.
 
@@ -205,4 +207,5 @@ The lesson worth carrying forward: **validate framework fit before designing aro
 - [ADR 0001](0001-database-setup-and-test-isolation.md) — per-test DB lifecycle + forensic fixture log; the cross-workspace isolation tests this ADR mandates are exercised through that infrastructure.
 - [ADR 0002](0002-test-cadence-and-tiering.md) — test cadence; the security-testing pass for cross-pollination probes runs in the pre-release tier.
 - [MVP_SCOPE.md](../../MVP_SCOPE.md) — tenancy model, definition-of-done, explicitly-deferred items.
+- [RFC 7519: JSON Web Token (JWT)](https://datatracker.ietf.org/doc/html/rfc7519) — the spec underlying this ADR's session model. Defines the standard claim names (`iat`, `exp`, etc.) we follow for interoperability with JWT libraries and tooling.
 - The project's TDD-first stance — every layer of this design lands red/green.
