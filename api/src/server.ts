@@ -4,6 +4,7 @@ import { loadConfig } from './config';
 import { pingDatabase } from './db';
 import { checkMigrationsCurrent } from './migrations';
 import { performSignup, validateSignupInput } from './auth/signup';
+import { validateVerifyEmailInput, verifyEmail } from './auth/verifyEmail';
 
 type CheckStatus = 'ok' | 'degraded' | 'failed';
 interface Check {
@@ -115,6 +116,22 @@ export async function buildApp(opts: FastifyServerOptions = {}): Promise<Fastify
     }
     const result = await performSignup(databaseUrl, validation.email, validation.password);
     return reply.status(201).send(result);
+  });
+
+  app.post('/auth/verify-email', async (request, reply) => {
+    const validation = validateVerifyEmailInput(request.body);
+    if (!validation.ok) {
+      return reply.status(400).send({ error: 'invalid token' });
+    }
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      return reply.status(500).send({ error: 'DATABASE_URL is not set' });
+    }
+    const result = await verifyEmail(databaseUrl, validation.token);
+    if (!result.ok) {
+      return reply.status(400).send({ error: 'invalid token' });
+    }
+    return reply.status(200).send({ success: true });
   });
 
   return app;
