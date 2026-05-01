@@ -1,27 +1,10 @@
 import { expect } from 'vitest';
 import type { Connection, ResultSetHeader } from 'mysql2/promise';
 
-const HARNESS_TABLES_SQL = [
-  `CREATE TABLE IF NOT EXISTS \`_pjs3_test_fixture_catalog\` (
-    fixtureCatalogId INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name             VARCHAR(255) NOT NULL,
-    UNIQUE KEY (name)
-  )`,
-  `CREATE TABLE IF NOT EXISTS \`_pjs3_test_fixture_log\` (
-    fixtureLogId     INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    fixtureCatalogId INT UNSIGNED NOT NULL,
-    test_name        VARCHAR(255) NULL,
-    created_at       DATETIME(6) NOT NULL,
-    load_time_ms     INT UNSIGNED NULL,
-    FOREIGN KEY (fixtureCatalogId) REFERENCES \`_pjs3_test_fixture_catalog\`(fixtureCatalogId)
-  )`,
-];
-
-export async function createHarnessTables(conn: Connection): Promise<void> {
-  for (const sql of HARNESS_TABLES_SQL) {
-    await conn.query(sql);
-  }
-}
+// Table-creation logic moved to `_harnessTables.ts` so `tests/globalSetup.ts`
+// can import it without pulling in the vitest runtime (`expect` is unavailable
+// in globalSetup's parent-process context).
+export { createHarnessTables } from './_harnessTables';
 
 async function upsertFixtureName(conn: Connection, name: string): Promise<number> {
   const [result] = await conn.query<ResultSetHeader>(
