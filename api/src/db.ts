@@ -26,6 +26,13 @@ export function parseDatabaseUrl(
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
     database: url.pathname.slice(1) || undefined,
+    // Force UTC for the session. Avoids the mysql2 + MySQL TIMESTAMP
+    // roundtrip footgun where local tz on the client and session tz on
+    // the server disagree, and a value written as `now + 24h` reads back
+    // shifted by the offset between them. With timezone: 'Z' the driver
+    // sets `SET time_zone = '+00:00'` on connect; what you write in UTC
+    // is what you read back in UTC.
+    timezone: 'Z',
   };
   if (connectTimeoutMs !== undefined) {
     opts.connectTimeout = connectTimeoutMs;

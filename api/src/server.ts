@@ -3,6 +3,7 @@ import pkg from '../package.json';
 import { loadConfig } from './config';
 import { pingDatabase } from './db';
 import { checkMigrationsCurrent } from './migrations';
+import { performSignup, validateSignupInput } from './auth/signup';
 
 type CheckStatus = 'ok' | 'degraded' | 'failed';
 interface Check {
@@ -101,6 +102,19 @@ export async function buildApp(opts: FastifyServerOptions = {}): Promise<Fastify
       await migrationsCurrentCheck(),
     ];
     return { status: overallStatus(checks), checks };
+  });
+
+  app.post('/auth/signup', async (request, reply) => {
+    const validation = validateSignupInput(request.body);
+    if (!validation.ok) {
+      return reply.status(400).send({ error: 'invalid input' });
+    }
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      return reply.status(500).send({ error: 'DATABASE_URL is not set' });
+    }
+    const result = await performSignup(databaseUrl, validation.email, validation.password);
+    return reply.status(201).send(result);
   });
 
   return app;

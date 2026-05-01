@@ -18,6 +18,7 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "argon2": "^0.44.0",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5",
     "mysql2": "^3.22.2"
