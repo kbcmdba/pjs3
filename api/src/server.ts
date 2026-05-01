@@ -5,6 +5,7 @@ import { pingDatabase } from './db';
 import { checkMigrationsCurrent } from './migrations';
 import { performSignup, validateSignupInput } from './auth/signup';
 import { validateVerifyEmailInput, verifyEmail } from './auth/verifyEmail';
+import { performLogin, validateLoginInput } from './auth/login';
 
 type CheckStatus = 'ok' | 'degraded' | 'failed';
 interface Check {
@@ -132,6 +133,31 @@ export async function buildApp(opts: FastifyServerOptions = {}): Promise<Fastify
       return reply.status(400).send({ error: 'invalid token' });
     }
     return reply.status(200).send({ success: true });
+  });
+
+  app.post('/auth/login', async (request, reply) => {
+    const validation = validateLoginInput(request.body);
+    if (!validation.ok) {
+      return reply.status(400).send({ error: 'invalid credentials' });
+    }
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      return reply.status(500).send({ error: 'DATABASE_URL is not set' });
+    }
+    const signingKey = process.env.JWT_SIGNING_KEY;
+    if (!signingKey) {
+      return reply.status(500).send({ error: 'JWT_SIGNING_KEY is not set' });
+    }
+    const result = await performLogin(
+      databaseUrl,
+      validation.email,
+      validation.password,
+      signingKey,
+    );
+    if (!result) {
+      return reply.status(400).send({ error: 'invalid credentials' });
+    }
+    return reply.status(200).send(result);
   });
 
   return app;
