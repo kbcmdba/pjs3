@@ -49,3 +49,29 @@ export async function signJwt(
 
   return { jwt, jti, iat, exp };
 }
+
+export interface VerifiedJwt {
+  userId: number;
+  currentWorkspaceId: number;
+  currentRoleId: number;
+  jti: string;
+  iat: number;
+  exp: number;
+}
+
+/**
+ * Verify a JWT signed with the given key and return its claims.
+ *
+ * Returns `{ ok: true, claims }` when the signature is valid, the token
+ * is unexpired, and all required claims are present. Returns `{ ok: false }`
+ * for any failure mode — bad signature, expired, malformed, missing
+ * required claims. The HTTP route is responsible for translating
+ * `{ ok: false }` into a 401 response; the failure mode is intentionally
+ * collapsed (account-enumeration / replay-defense).
+ */
+export async function verifyJwt(
+  _token: string,
+  _signingKey: string,
+): Promise<{ ok: true; claims: VerifiedJwt } | { ok: false }> {
+  throw new Error('verifyJwt: not implemented (TDD red step)');
+}
